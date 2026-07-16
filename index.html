@@ -362,6 +362,7 @@ const S = {
   settings:{vol:0.8, music:true, post:true, sway:true, sharp:'balanced'},
   omens:{aurora:false, rainbow:false, dolphins:false, deepHint:false},
   hull:100, stats:{sold:0, delivered:0}, questIdx:0,
+  folk:{}, paint:{hull:'#24525a', cabin:'#bdae8f', trim:'#523b24', glass:'warm'},
 };
 let titleMode=true, paused=false;
 
@@ -374,6 +375,7 @@ function save(){
     codex:S.codex, curios:S.curios, notesRead:S.notesRead, leviathanSeen:S.leviathanSeen,
     boat:{x:S.boat.x,z:S.boat.z,heading:S.boat.heading}, pieceSeq:S.pieceSeq, contractSeq:S.contractSeq, lastRegenDay:S.lastRegenDay,
     settings:S.settings, omens:S.omens, hull:S.hull, stats:S.stats, questIdx:S.questIdx,
+    folk:S.folk, paint:S.paint,
   })); }catch(e){}
 }
 function loadSave(){
@@ -386,11 +388,13 @@ function loadSave(){
       lastRegenDay:d.lastRegenDay||d.day});
     S.boat.x=d.boat.x; S.boat.z=d.boat.z; S.boat.heading=d.boat.heading; S.boat.speed=0;
     S.settings=Object.assign({vol:0.8, music:true, post:true, sway:true, sharp:'balanced'}, d.settings||{});
-    S.omens=Object.assign({aurora:false, rainbow:false, dolphins:false, deepHint:false}, d.omens||{});
+    S.omens=Object.assign({aurora:false, rainbow:false, dolphins:false, deepHint:false, springFound:false}, d.omens||{});
     S.upgrades=Object.assign({engine:false,lamps:false,hold:false,icebox:false,lures:false,ledger:false,silent:false,longline:false,hold2:false}, d.upgrades||{});
     S.hull=(typeof d.hull==='number')?d.hull:100;
     S.stats=Object.assign({sold:0,delivered:0}, d.stats||{});
     S.questIdx=d.questIdx||0;
+    S.folk=d.folk||{};
+    S.paint=Object.assign({hull:'#24525a', cabin:'#bdae8f', trim:'#523b24', glass:'warm'}, d.paint||{});
     return true;
   }catch(e){ return false; }
 }
@@ -684,6 +688,7 @@ scene.add(water);
 
 // ---------- world generation ----------
 const islands=[]; const kelpPatches=[]; const reefPatches=[]; const deepZones=[]; const zones=[];
+let wreckSite=null, springSite=null, marketIslName=null;
 function genWorld(){
   const R = mulberry32(worldSeed);
   const names = [...ISLE_NAMES];
@@ -720,8 +725,21 @@ function genWorld(){
     }
     if(ok) deepZones.push({x:dx, z:dz, r:26+R()*8});
   }
+  // a wreck and a warm spring, for the wanderers
+  const clearOf=(x,z,m)=> islands.every(o=>Math.hypot(x-o.x,z-o.z)>o.r+m)
+    && kelpPatches.concat(reefPatches).every(k=>Math.hypot(x-k.x,z-k.z)>k.r+m)
+    && deepZones.every(k=>Math.hypot(x-k.x,z-k.z)>k.r+m);
+  for(let t=0;t<30 && !wreckSite;t++){
+    const a=R()*Math.PI*2, d=75+R()*150, x=Math.cos(a)*d, z=Math.sin(a)*d;
+    if(clearOf(x,z,32)) wreckSite={x,z};
+  }
+  for(let t=0;t<30 && !springSite;t++){
+    const a=R()*Math.PI*2, d=75+R()*160, x=Math.cos(a)*d, z=Math.sin(a)*d;
+    if(clearOf(x,z,32) && (!wreckSite||Math.hypot(x-wreckSite.x,z-wreckSite.z)>60)) springSite={x,z};
+  }
   // fishing zones
   for(const isl of islands) zones.push({x:isl.x, z:isl.z, inner:isl.r+8, outer:isl.r+34, biome:'sand', shadows:[]});
+  if(wreckSite) zones.push({x:wreckSite.x, z:wreckSite.z, inner:0, outer:15, biome:'sand', wreck:true, shadows:[]});
   for(const k of kelpPatches) zones.push({x:k.x, z:k.z, inner:0, outer:k.r, biome:'kelp', shadows:[]});
   for(const k of reefPatches) zones.push({x:k.x, z:k.z, inner:0, outer:k.r, biome:'reef', shadows:[]});
   for(const k of deepZones) zones.push({x:k.x, z:k.z, inner:0, outer:k.r, biome:'deep', shadows:[]});
@@ -771,6 +789,7 @@ function refreshDaily(){
   const shift=(Rd()-0.5)*0.7;
   duskTintR = 1+Math.max(0,shift)*0.5;
   duskTintB = 1+Math.max(0,-shift)*2.2;
+  marketIslName = (S.day%3===2 && islands.length) ? islands[(Rd()*islands.length)|0].name : null;
 }
 // push dome vertices around radially so islands stop being perfect spheres
 function bumpy(geo, amp, seed){
@@ -1188,6 +1207,33 @@ function buildIslands(){
       new THREE.MeshBasicMaterial({color:0x2a4a6a,transparent:true,opacity:0.22,depthWrite:false}));
     rim.rotation.x=-Math.PI/2; rim.position.set(dz.x,0.42,dz.z); scene.add(rim);
   }
+  // the old wreck — her ribs still hold letters
+  if(wreckSite){
+    const wm=new THREE.MeshStandardMaterial({color:0x3c332a,roughness:1,emissive:new THREE.Color().setRGB(0.02,0.018,0.015)});
+    landMats.push(wm);
+    const h1=new THREE.Mesh(new THREE.BoxGeometry(2.6,1.4,4.2), wm);
+    h1.position.set(wreckSite.x, -0.15, wreckSite.z); h1.rotation.set(0.4,0.6,0.28); scene.add(h1);
+    const h2=new THREE.Mesh(new THREE.BoxGeometry(2.2,1.1,2.6), wm);
+    h2.position.set(wreckSite.x+4.4, -0.35, wreckSite.z+2.2); h2.rotation.set(-0.3,1.4,-0.35); scene.add(h2);
+    const mast=new THREE.Mesh(new THREE.CylinderGeometry(0.1,0.14,7,6), wm);
+    mast.position.set(wreckSite.x+1, 1.2, wreckSite.z+0.6); mast.rotation.z=1.05; mast.rotation.x=0.3; scene.add(mast);
+  }
+  // the warm spring — kind water in a ring of stones
+  if(springSite){
+    const sm=new THREE.MeshStandardMaterial({color:0x8a8278,roughness:1,emissive:new THREE.Color().setRGB(0.04,0.038,0.034)});
+    landMats.push(sm);
+    const Rs=mulberry32((springSite.x*3+springSite.z*5)|0);
+    for(let i=0;i<7;i++){
+      const a=i/7*Math.PI*2+Rs()*0.4;
+      const rock=new THREE.Mesh(new THREE.IcosahedronGeometry(0.9+Rs()*0.7,0), sm);
+      rock.position.set(springSite.x+Math.cos(a)*5.5, 0.2+Rs()*0.3, springSite.z+Math.sin(a)*5.5);
+      rock.rotation.set(Rs()*3,Rs()*3,Rs()*3); rock.scale.y=0.65;
+      scene.add(rock);
+    }
+    const pool=new THREE.Mesh(new THREE.CircleGeometry(4.6,24),
+      new THREE.MeshBasicMaterial({color:0x9adce4,transparent:true,opacity:0.4,depthWrite:false}));
+    pool.rotation.x=-Math.PI/2; pool.position.set(springSite.x,0.5,springSite.z); scene.add(pool);
+  }
   // shallow tint lives in the water shader — feed it island + outcrop + reef footprints
   islands.forEach((isl,i)=>{ waterUni.uIsles.value[i].set(isl.x, isl.z, isl.r); });
   outcrops.forEach((o,i)=>{ waterUni.uIsles.value[islands.length+i].set(o.x, o.z, 5); });
@@ -1214,6 +1260,7 @@ function buildIslands(){
   }
   for(const o of outcrops) addBuoy(o.x+6.5, o.z+3);
   for(const dz of deepZones) addBuoy(dz.x+dz.r*0.9, dz.z+2);
+  if(wreckSite) addBuoy(wreckSite.x-6, wreckSite.z-3);
   // kelp — a swaying forest with a floating canopy, not an oil slick
   for(const k of kelpPatches){
     const R2 = mulberry32((k.x*13+k.z*7)|0);
@@ -1258,6 +1305,17 @@ function buildIslands(){
 // ---------- boat ----------
 const boat = new THREE.Group();
 let lanternMesh=null, boatLamp=null, blobShadow=null;
+const boatMats={};
+const GLASS_TINTS={warm:0xffc860, rose:0xff8aa0, seaglass:0x9affc8};
+function applyPaint(){
+  if(!boatMats.top) return;
+  boatMats.top.color.set(S.paint.hull);
+  boatMats.cabin.color.set(S.paint.cabin);
+  boatMats.wood.color.set(S.paint.trim);
+  const gt=GLASS_TINTS[S.paint.glass]||GLASS_TINTS.warm;
+  boatMats.lantern.emissive.set(gt); boatMats.lantern.color.set(gt);
+  boatMats.lamp.color.set(gt);
+}
 function buildBoat(){
   const topMat = new THREE.MeshStandardMaterial({color:new THREE.Color().setRGB(0.14,0.32,0.34),roughness:0.75,side:THREE.DoubleSide});
   const belowMat = new THREE.MeshStandardMaterial({color:new THREE.Color().setRGB(0.44,0.19,0.14),roughness:0.9,side:THREE.DoubleSide});
@@ -1338,6 +1396,8 @@ function buildBoat(){
   lanternMesh.position.set(0,1.66,2.30); boat.add(lanternMesh);
   boatLamp = new THREE.PointLight(0xffd07a, 0.0, 30, 1.6);
   boatLamp.position.set(0,1.85,2.1); boat.add(boatLamp);
+  boatMats.top=topMat; boatMats.cabin=creamMat; boatMats.wood=woodMat;
+  boatMats.lantern=lanternMesh.material; boatMats.lamp=boatLamp;
   setCast(boat);
   // soft blob shadow keeps the hull grounded on the water
   blobShadow = new THREE.Mesh(new THREE.PlaneGeometry(4.6,7.4),
@@ -2218,7 +2278,7 @@ function showDayCard(){
   const from=(windDir+Math.PI)%(Math.PI*2);
   const dirName=COMPASS[Math.round(from/(Math.PI/4))%8];
   const wx=S.weather==='rain'?'rain':S.weather==='overcast'?'overcast':'clear skies';
-  $('daycard').innerHTML=`Day ${S.day}<div style="font-size:15px;margin-top:6px;opacity:0.8;">${wx} · wind from the ${dirName}</div>`;
+  $('daycard').innerHTML=`Day ${S.day}<div style="font-size:15px;margin-top:6px;opacity:0.8;">${wx} · wind from the ${dirName}${marketIslName?` · market day at ${marketIslName}`:''}</div>`;
   $('daycard').style.opacity='1';
   dayCardT=4;
 }
@@ -2253,6 +2313,26 @@ function updateLife(dt){
   updateGlints(dt);
   for(const sp of spinners) sp.m.rotation.z += sp.spd*dt;
   updateBeachGulls(dt);
+  // the warm spring mends old timbers
+  if(springSite){
+    updateLife.sprAcc=(updateLife.sprAcc||0)+dt;
+    if(updateLife.sprAcc>0.8){
+      updateLife.sprAcc=0;
+      spawnSmoke(new THREE.Vector3(springSite.x+(Math.random()-0.5)*3, 0.7, springSite.z+(Math.random()-0.5)*3), 0.35);
+    }
+    if(Math.hypot(S.boat.x-springSite.x, S.boat.z-springSite.z)<9){
+      if(S.hull<100){
+        S.hull=Math.min(100, S.hull+dt*1.5);
+        updateLife.sprHud=(updateLife.sprHud||0)+dt;
+        if(updateLife.sprHud>2){ updateLife.sprHud=0; S.hull=Math.round(S.hull); updateHUD(); }
+      }
+      if(!S.omens.springFound){
+        S.omens.springFound=true;
+        toast('The water here is warm — kind to old timbers. The hull breathes easier.', true);
+        save();
+      }
+    }
+  }
   // first brush with the fathomless water
   if(!S.omens.deepHint && !S.upgrades.longline && S.mode==='sail'){
     for(const dz of deepZones){
@@ -2421,7 +2501,7 @@ function updateShadows(dt){
       if(!elig.length) continue;
       if(Math.random()<0.55){
         let id;
-        if(Math.random()<0.035){ id='bottle'; }
+        if(Math.random()<(z.wreck?0.16:0.035)){ id='bottle'; }
         else{
           const tot=elig.reduce((s,e)=>s+e.w,0); let r=Math.random()*tot;
           for(const e of elig){ r-=e.w; if(r<=0){ id=e.id; break; } }
@@ -2826,6 +2906,14 @@ function updateTracker(){
       📦 <b>${c.to}</b> · ${Math.round(d)}m · $${c.reward}${bonusLive?` <span style="color:var(--teal)">+$${c.bonus} by dusk</span>`:''}`;
     tr.appendChild(row);
   }
+  for(const f of folkList){
+    const st=S.folk[f.key];
+    if(st && st.req && st.req.accepted){
+      const row=document.createElement('div'); row.className='track-row';
+      row.innerHTML=`🎁 <b>${st.req.n}× ${SPECIES[st.req.species].name}</b> for ${f.name} · ${f.isl} (${heldOf(st.req.species)}/${st.req.n})`;
+      tr.appendChild(row);
+    }
+  }
 }
 function showPrompt(html){ const p=$('prompt'); p.innerHTML=html; p.style.display='block'; }
 function hidePrompt(){ $('prompt').style.display='none'; }
@@ -3130,6 +3218,120 @@ function newDay(){
   save();
 }
 
+// ---------- the folk ----------
+const FOLK_ROLES={
+  harbormaster:{title:'Harbormaster', hat:'cap',
+    lines:["Wind's honest today. Take it while it lasts.","That red ketch out there runs the same loop her father did.","Keep your hull off the rocks and the sea will keep her opinions to herself."],
+    rain:"Rain's good for the cisterns and bad for my knees.", night:"Late crossing? The lamps will see you home."},
+  keeper:{title:'Lighthouse keeper', hat:'none',
+    lines:["The light's never gone out. Not in my lifetime, nor my mother's.","From up top you can see all four islands, and everything that swims between.","People think it's lonely work. The whole sea visits me nightly."],
+    rain:"The light works harder in weather like this. So do I.", night:"She turns all night, and so do I."},
+  kid:{title:'Dock kid', hat:'beanie',
+    lines:["Did you see the dolphins?! I saw them FIRST.","When I'm big I'm getting a boat with TWO lanterns.","The cat won't chase gulls anymore. I think they made a deal."],
+    rain:"Puddle-jumping day!", night:"I'm not supposed to be out this late. Don't tell."},
+  netmender:{title:'Netmender', hat:'kerchief',
+    lines:["Nets tell you everything, if you mend enough of them.","A hole the size of a thumb loses a fish the size of an arm.","My hands know this work better than I do."],
+    rain:"Wet rope is stubborn rope.", night:"I mend by lamplight. The knots don't care."},
+  fisher:{title:'Old fisher', hat:'straw',
+    lines:["The Deeps took my best line, years back. Respect them.","Watch the gulls. They fish better than any of us.","Slow in, soft cast. The rest is patience."],
+    rain:"Storm Drum weather. Mark my words.", night:"Night water pays those with lamps and nerve."},
+  painter:{title:'Keeper of the Paintworks', hat:'none',
+    lines:["A boat should look like her captain. Come see my colors.","I mixed that teal from a mackerel's back. True story.","A fresh coat won't make her faster. It'll make you prouder, though."],
+    rain:"Nothing dries today. Come in anyway.", night:"Colors sleep at night. Come back with the sun."},
+  miller:{title:'Miller', hat:'flour',
+    lines:["The wind grinds the grain and minds its own business.","Four sails up top, one boat below — that's my whole world.","You can hear the mill from the reef, they say. A friendly sound."],
+    rain:"The mill likes rain-wind best. Greedy thing.", night:"She creaks all night. I sleep better for it."},
+  baker:{title:'Baker', hat:'none',
+    lines:["Rain days are baking days. Sun days are also baking days.","Fish for your table, bread for the trip home.","The miller grumbles, but his flour is the best on the water."],
+    rain:"Perfect. The oven hates dry wind.", night:"Dough's rising. So's the moon."},
+  mason:{title:'Stonemason', hat:'cap',
+    lines:["Stone remembers. That's the whole trade.","Every wall on this island came up from the quarry on my father's back or mine.","The cairn? Older than any of us. We just keep it company."],
+    rain:"Rain shows you every crack you missed.", night:"The cairn lantern was my grandmother's idea. Good ideas outlive us."},
+  gran:{title:'Nan of the isle', hat:'kerchief',
+    lines:["I've seen the sky go green twice in my life. Once was last spring.","Sit a moment. The fish will wait — they always have.","My husband fished the Deeps. The Deeps were fond of him, mostly."],
+    rain:"The rain's an old friend. Loud, but kind.", night:"Stars are thickest just before you give up looking."},
+};
+const ISLAND_FOLK=[['harbormaster','keeper','kid'],['netmender','fisher','painter'],['miller','baker'],['mason','gran']];
+const FOLK_NAMES=['Rooke','Isla','Pip','Marta','Old Bren','Sorrel','Cormac','June','Wick','Nan Aggie','Petra','Tam'];
+const folkList=[];
+function makePortrait(seed, role){
+  const R=mulberry32(seed);
+  const c=document.createElement('canvas'); c.width=c.height=96;
+  const x=c.getContext('2d');
+  const skins=['#e8c49a','#d9a878','#c08a5c','#8a5f3c'];
+  const hairs=['#3a2c1e','#6a4a2a','#9a8a6a','#c8c0b0','#7a3028'];
+  const shirts=['#5a7a8a','#7a5a4a','#6a7a52','#8a5a6a','#4a5a7a'];
+  const skin=skins[(R()*skins.length)|0], hair=hairs[(R()*hairs.length)|0], shirt=shirts[(R()*shirts.length)|0];
+  x.fillStyle='#2a3646'; x.fillRect(0,0,96,96);
+  x.fillStyle='rgba(232,182,76,0.10)'; x.beginPath(); x.arc(48,44,40,0,6.28); x.fill();
+  // shirt
+  x.fillStyle=shirt; x.beginPath(); x.ellipse(48,96,30,26,0,Math.PI,0); x.fill();
+  // head
+  x.fillStyle=skin; x.beginPath(); x.ellipse(48,46,19,21,0,0,6.28); x.fill();
+  // hair back/sides (unless hooded)
+  const hatType=FOLK_ROLES[role].hat;
+  if(hatType!=='kerchief'){
+    x.fillStyle=hair; x.beginPath(); x.ellipse(48,34,20,13,0,Math.PI,0); x.fill();
+    if(R()<0.5){ x.fillRect(28,34,5,14); x.fillRect(63,34,5,14); }
+  }
+  // hats
+  if(hatType==='cap'){ x.fillStyle='#2e3c4e'; x.fillRect(27,24,42,9); x.fillRect(24,31,48,4); }
+  else if(hatType==='straw'){ x.fillStyle='#c8a862'; x.beginPath(); x.ellipse(48,28,26,7,0,0,6.28); x.fill(); x.fillRect(36,16,24,12); }
+  else if(hatType==='beanie'){ x.fillStyle='#8a4030'; x.beginPath(); x.ellipse(48,30,19,10,0,Math.PI,0); x.fill(); }
+  else if(hatType==='kerchief'){ x.fillStyle='#8a6a8a'; x.beginPath(); x.ellipse(48,32,20,13,0,Math.PI,0); x.fill(); x.fillRect(28,32,40,5); }
+  else if(hatType==='flour'){ x.fillStyle='#e8e4d8'; x.beginPath(); x.ellipse(48,27,17,9,0,Math.PI,0); x.fill(); x.fillRect(31,27,34,5); }
+  // eyes + brows + mouth + cheeks
+  x.fillStyle='#2a2018';
+  x.beginPath(); x.arc(41,46,2.2,0,6.28); x.arc(55,46,2.2,0,6.28); x.fill();
+  x.strokeStyle='#2a2018'; x.lineWidth=1.6;
+  x.beginPath(); x.moveTo(37,41); x.lineTo(45,40.4); x.moveTo(51,40.4); x.lineTo(59,41); x.stroke();
+  x.strokeStyle='#8a4a3a'; x.lineWidth=2;
+  x.beginPath(); x.arc(48,53,6.5,0.25*Math.PI,0.75*Math.PI); x.stroke();
+  x.fillStyle='rgba(220,120,100,0.30)';
+  x.beginPath(); x.arc(36,52,3.4,0,6.28); x.arc(60,52,3.4,0,6.28); x.fill();
+  if(role==='fisher'||role==='mason'){ x.fillStyle=hair; x.beginPath(); x.ellipse(48,60,10,6,0,0,Math.PI); x.fill(); }
+  return c.toDataURL();
+}
+function buildFolk(){
+  const R=mulberry32(worldSeed+404);
+  const names=[...FOLK_NAMES];
+  islands.forEach((isl,i)=>{
+    const roles=ISLAND_FOLK[i%ISLAND_FOLK.length];
+    roles.forEach((role,j)=>{
+      const key=`f${i}_${j}`;
+      const name=role==='gran'?'Nan Aggie':names.splice((R()*names.length)|0,1)[0]||'Alby';
+      folkList.push({key, name, role, isl:isl.name, portrait:makePortrait(worldSeed+i*31+j*7, role)});
+      if(!S.folk[key]) S.folk[key]={warmth:0, req:null, cd:0};
+    });
+  });
+}
+function folkGreeting(f){
+  const st=S.folk[f.key], role=FOLK_ROLES[f.role];
+  const w=st.warmth;
+  if(w>=6) return `${f.name} waves you in like family.`;
+  if(w>=2) return `${f.name} nods — you're becoming a familiar sail.`;
+  return `${f.name} sizes up the stranger's boat.`;
+}
+function folkLine(f){
+  const role=FOLK_ROLES[f.role];
+  const night=(S.hour>=20.5||S.hour<5);
+  const pool=[...role.lines];
+  if(S.weather==='rain') pool.push(role.rain, role.rain);
+  if(night) pool.push(role.night, role.night);
+  return pool[(Math.random()*pool.length)|0];
+}
+function maybeFolkRequest(f){
+  const st=S.folk[f.key];
+  if(st.req || S.day<st.cd || f.role==='kid' || f.role==='painter') return;
+  const R=mulberry32(worldSeed+S.day*97+f.key.length*13+folkList.indexOf(f)*7);
+  if(R()>0.6) return;
+  const ids=Object.keys(SPECIES).filter(id=>SPECIES[id].rar!=='rare');
+  const sp=ids[(R()*ids.length)|0];
+  const n=SPECIES[sp].rar==='common'?(1+(R()*2|0)+1):1;
+  st.req={species:sp, n, reward:Math.round((SPECIES[sp].base*n*1.6+12)/5)*5, accepted:false};
+}
+function heldOf(sp){ return S.pieces.filter(p=>p.kind==='fish'&&p.species===sp).length; }
+
 // ---------- docking ----------
 let dockTab='market';
 function nearDock(){
@@ -3146,27 +3348,36 @@ function openDock(isl){
   $('dock-sub').textContent = isl.home?'Home port · the light is always on':'A quiet harbor';
   $('btn-sleep').style.display='inline-block';
   updateRepairBtn(isl);
-  dockTab = 'market';
+  dockTab = 'market'; folkView=null;
   renderDockTabs(isl);
   renderDockBody(isl);
   $('dock-panel').style.display='flex';
   save();
 }
 function renderDockTabs(isl){
-  const tabs=[['market','Market'],['contracts','Contracts']];
+  const tabs=[['market','Market'],['contracts','Contracts'],['folk','Folk']];
   if(isl.home) tabs.push(['shipwright','Shipwright']);
+  if(islands[1] && isl.name===islands[1].name) tabs.push(['paint','Paintworks']);
   const el=$('dock-tabs'); el.innerHTML='';
   for(const [id,label] of tabs){
     const b=document.createElement('button'); b.className='tab'+(dockTab===id?' active':''); b.textContent=label;
-    b.addEventListener('click',()=>{ dockTab=id; renderDockTabs(isl); renderDockBody(isl); });
+    b.addEventListener('click',()=>{ dockTab=id; folkView=null; renderDockTabs(isl); renderDockBody(isl); });
     el.appendChild(b);
   }
 }
+let folkView=null;
 function renderDockBody(isl){
   const body=$('dock-body'); body.innerHTML='';
+  const mk=(marketIslName && isl.name===marketIslName)?1.35:1;
   if(dockTab==='market'){
+    if(mk>1){
+      const note=document.createElement('div'); note.className='empty-note';
+      note.style.cssText='color:var(--gold);padding:4px 6px 10px;';
+      note.textContent='🎪 Market day — everything sells +35% here today.';
+      body.appendChild(note);
+    }
     const fish=S.pieces.filter(p=>p.kind==='fish'||p.kind==='curio');
-    if(!fish.length){ body.innerHTML='<div class="empty-note">Nothing in the hold to sell. The fish are out there.</div>'; return; }
+    if(!fish.length){ body.innerHTML+='<div class="empty-note">Nothing in the hold to sell. The fish are out there.</div>'; return; }
     let total=0;
     for(const p of fish){
       const row=document.createElement('div'); row.className='row';
@@ -3177,7 +3388,7 @@ function renderDockBody(isl){
         b.addEventListener('click',()=>{ S.money+=4; S.stats.sold++; S.pieces=S.pieces.filter(x=>x.id!==p.id); sfxCoin(); updateHUD(); renderDockBody(isl); save(); });
         row.appendChild(b); body.appendChild(row); total+=4; continue;
       }
-      const sp=SPECIES[p.species]; const fr=freshness(p); const price=fishPrice(p);
+      const sp=SPECIES[p.species]; const fr=freshness(p); const price=Math.round(fishPrice(p)*mk);
       total+=price;
       row.innerHTML=`<div class="info"><div class="name">${sp.icon} ${sp.name}
           <span class="fresh-tag ${fr>0.8?'fresh-hi':'fresh-lo'}">${fr>0.8?'fresh':fr>0.55?'day-old':'tired'}</span></div>
@@ -3231,6 +3442,101 @@ function renderDockBody(isl){
       });
       row.appendChild(b); body.appendChild(row);
     }
+  }
+  else if(dockTab==='folk'){
+    const here=folkList.filter(f=>f.isl===isl.name);
+    if(folkView){
+      const f=here.find(x=>x.key===folkView)||here[0];
+      const st=S.folk[f.key];
+      maybeFolkRequest(f);
+      const wrap=document.createElement('div');
+      wrap.style.cssText='display:flex;gap:14px;align-items:flex-start;';
+      wrap.innerHTML=`<img src="${f.portrait}" style="width:96px;height:96px;border-radius:12px;border:1px solid var(--panel-line);flex-shrink:0;">
+        <div><div class="name" style="font-size:16px;">${f.name} <span style="color:var(--dim);font-size:12px;">· ${FOLK_ROLES[f.role].title}</span></div>
+        <div id="folk-line" style="font-family:Georgia,serif;font-style:italic;font-size:14px;line-height:1.6;color:#dce4f0;margin-top:8px;">“${folkLine(f)}”</div></div>`;
+      body.appendChild(wrap);
+      const btns=document.createElement('div'); btns.style.cssText='display:flex;gap:8px;margin-top:14px;flex-wrap:wrap;';
+      const more=document.createElement('button'); more.className='btn'; more.textContent='Talk';
+      more.addEventListener('click',()=>{ $('folk-line').textContent='“'+folkLine(f)+'”'; });
+      btns.appendChild(more);
+      if(st.req && !st.req.accepted){
+        const sp=SPECIES[st.req.species];
+        const rb=document.createElement('button'); rb.className='btn teal';
+        rb.textContent=`A favor: ${st.req.n}× ${sp.name} — $${st.req.reward}`;
+        rb.addEventListener('click',()=>{ st.req.accepted=true; toast(`${f.name} will be waiting. (${st.req.n}× ${sp.name})`); renderDockBody(isl); updateTracker(); save(); });
+        btns.appendChild(rb);
+      } else if(st.req && st.req.accepted){
+        const sp=SPECIES[st.req.species];
+        const have=heldOf(st.req.species);
+        const db=document.createElement('button'); db.className='btn teal';
+        db.textContent=`Hand over ${st.req.n}× ${sp.name} (${have}/${st.req.n}) — $${st.req.reward}`;
+        db.disabled=have<st.req.n;
+        db.addEventListener('click',()=>{
+          let left=st.req.n;
+          S.pieces=S.pieces.filter(p=>{ if(left>0&&p.kind==='fish'&&p.species===st.req.species){ left--; return false; } return true; });
+          S.money+=st.req.reward; st.warmth+=2; st.req=null; st.cd=S.day+2;
+          sfxCoin(); toast(`${f.name} beams. “Knew I liked your sail.”`);
+          updateHUD(); renderDockBody(isl); updateTracker(); save();
+        });
+        btns.appendChild(db);
+      }
+      const back=document.createElement('button'); back.className='btn'; back.textContent='← Everyone';
+      back.addEventListener('click',()=>{ folkView=null; renderDockBody(isl); });
+      btns.appendChild(back);
+      body.appendChild(btns);
+      if(st.warmth===0){ st.warmth=1; save(); }
+      return;
+    }
+    for(const f of here){
+      maybeFolkRequest(f);
+      const st=S.folk[f.key];
+      const row=document.createElement('div'); row.className='row';
+      row.innerHTML=`<img src="${f.portrait}" style="width:44px;height:44px;border-radius:9px;border:1px solid var(--panel-line);">
+        <div class="info"><div class="name">${f.name} <span style="color:var(--dim);font-weight:400;font-size:11px;">${FOLK_ROLES[f.role].title}</span>${st.req&&!st.req.accepted?' <span style="color:var(--teal);font-size:11px;">· has a favor to ask</span>':''}</div>
+        <div class="meta">${folkGreeting(f)}</div></div>`;
+      const b=document.createElement('button'); b.className='btn'; b.textContent='Talk';
+      b.addEventListener('click',()=>{ folkView=f.key; renderDockBody(isl); });
+      row.appendChild(b); body.appendChild(row);
+    }
+  }
+  else if(dockTab==='paint'){
+    const note=document.createElement('div'); note.className='empty-note'; note.style.padding='4px 6px 12px';
+    note.textContent='“A boat should look like her captain.” — $20 a coat.';
+    body.appendChild(note);
+    const PAINTS={
+      hull:{label:'Hull', opts:['#24525a','#7a3040','#2a3a5e','#2e5a3a','#9a7a3a','#55606e']},
+      cabin:{label:'Cabin & deck', opts:['#bdae8f','#e8e6da','#9ab8c8','#a8b89a']},
+      trim:{label:'Rail & trim', opts:['#523b24','#3a2c1e','#8a4030','#cfc8b8']},
+    };
+    const buyCoat=(part,val)=>{
+      if(S.paint[part]===val) return;
+      if(S.money<20){ toast('Paint costs $20 a coat.'); return; }
+      S.money-=20; S.paint[part]=val; applyPaint(); sfxCoin();
+      updateHUD(); renderDockBody(isl); save();
+    };
+    for(const [part,def] of Object.entries(PAINTS)){
+      const row=document.createElement('div'); row.className='row';
+      row.innerHTML=`<div class="info"><div class="name">${def.label}</div></div>`;
+      const sw=document.createElement('div'); sw.style.cssText='display:flex;gap:6px;';
+      for(const cc of def.opts){
+        const b=document.createElement('button');
+        b.style.cssText=`width:26px;height:26px;border-radius:7px;cursor:pointer;background:${cc};border:2px solid ${S.paint[part]===cc?'var(--gold)':'rgba(242,233,216,0.25)'};`;
+        b.addEventListener('click',()=>buyCoat(part,cc));
+        sw.appendChild(b);
+      }
+      row.appendChild(sw); body.appendChild(row);
+    }
+    const GLASS={warm:'#ffc860', rose:'#ff8aa0', seaglass:'#9affc8'};
+    const row=document.createElement('div'); row.className='row';
+    row.innerHTML=`<div class="info"><div class="name">Lantern glass</div><div class="meta">the light you sail home by</div></div>`;
+    const sw=document.createElement('div'); sw.style.cssText='display:flex;gap:6px;';
+    for(const [gk,gc] of Object.entries(GLASS)){
+      const b=document.createElement('button');
+      b.style.cssText=`width:26px;height:26px;border-radius:50%;cursor:pointer;background:${gc};border:2px solid ${S.paint.glass===gk?'var(--gold)':'rgba(242,233,216,0.25)'};`;
+      b.addEventListener('click',()=>buyCoat('glass',gk));
+      sw.appendChild(b);
+    }
+    row.appendChild(sw); body.appendChild(row);
   }
   else if(dockTab==='shipwright'){
     const UP=[
@@ -3708,12 +4014,14 @@ function initFreshState(){
     holdW:4,holdH:3,pieces:[],contracts:[],accepted:[],codex:{},curios:0,notesRead:[],leviathanSeen:false,
     pieceSeq:1,contractSeq:1,lastRegenDay:1,
     omens:{aurora:false, rainbow:false, dolphins:false, deepHint:false},
-    hull:100, stats:{sold:0, delivered:0}, questIdx:0});
+    hull:100, stats:{sold:0, delivered:0}, questIdx:0,
+    folk:{}, paint:{hull:'#24525a', cabin:'#bdae8f', trim:'#523b24', glass:'warm'}});
 }
 function buildAll(){
   genWorld(); buildIslands(); buildBoat(); buildRain(); buildGulls();
-  buildAIBoat(); buildFogBanks(); buildAurora(); buildRainbow(); placeVillagers(); buildTufts();
+  buildAIBoat(); buildFogBanks(); buildAurora(); buildRainbow(); placeVillagers(); buildTufts(); buildFolk();
   refreshDaily();
+  applyPaint();
 }
 function placeBoatAtHome(){
   const home=islands[0];

@@ -280,6 +280,33 @@ const SPECIES = {
   eel:      {name:'Grey Eel',        icon:'🐍', biome:'kelp', hours:[19,6],  weather:null,  rar:'uncommon', cells:[[0,0],[0,1],[0,2],[0,3]],     base:26, color:'#8a93a6', ring:{speed:250,arc:55,hits:2}, hint:'Long and sly. The kelp after dark.'},
   sprat:    {name:'Lantern Sprat',   icon:'✨', biome:'any',  hours:[21,5],  weather:null,  rar:'common',   cells:[[0,0]],                       base:12, color:'#e8d47a', ring:{speed:210,arc:66,hits:1}, hint:'Rises to lamplight in the deep of night.'},
   moonveil: {name:'Moonveil Snapper',icon:'🌙', biome:'sand', hours:[21,4],  weather:'rain',rar:'rare',     cells:[[0,0],[0,1],[1,0],[1,1]],     base:60, color:'#b48fd4', ring:{speed:280,arc:44,hits:3}, hint:'Only when rain falls on dark water over sand. Or so they say.'},
+  // — more of the sandy shallows —
+  smelt:    {name:'Silver Smelt',    icon:'🐟', biome:'sand', hours:[6,19],  weather:null,  rar:'common',   cells:[[0,0]],                       base:5,  color:'#c2ccd4', ring:{speed:160,arc:75,hits:1}, hint:'Everywhere the water is bright. A start.'},
+  whiting:  {name:'Dawn Whiting',    icon:'🐟', biome:'sand', hours:[5,9],   weather:null,  rar:'common',   cells:[[0,0],[0,1]],                 base:11, color:'#d4c8a8', ring:{speed:190,arc:64,hits:1}, hint:'First light only. Sleeps through the day.'},
+  hermit:   {name:'Hermit Crab',     icon:'🦀', biome:'sand', hours:[6,20],  weather:null,  rar:'common',   cells:[[0,0]],                       base:7,  color:'#c98a5a', ring:{speed:140,arc:70,hits:1}, hint:'Sidles along the bottom near the beaches.'},
+  flounder: {name:'Flat Flounder',   icon:'🐟', biome:'sand', hours:[6,19],  weather:null,  rar:'uncommon', cells:[[0,0],[0,1],[1,0]],           base:16, color:'#a89468', ring:{speed:200,arc:58,hits:2}, hint:'Lies flat as a plate on the sand. Look twice.'},
+  bream:    {name:'Gilded Bream',    icon:'🐟', biome:'sand', hours:[8,17],  weather:'clear',rar:'uncommon',cells:[[0,0],[1,0]],                 base:22, color:'#d8b45a', ring:{speed:240,arc:54,hits:2}, hint:'Only under an honest blue sky.'},
+  drum:     {name:'Storm Drum',      icon:'🐟', biome:'sand', hours:[6,19],  weather:'rain',rar:'uncommon', cells:[[0,0],[0,1],[1,0],[1,1]],     base:34, color:'#7a88b8', ring:{speed:250,arc:52,hits:2}, hint:'Rises when rain drums the daytime sea.'},
+  // — more of the kelp —
+  kelpcrab: {name:'Kelp Crab',       icon:'🦀', biome:'kelp', hours:[6,19],  weather:null,  rar:'common',   cells:[[0,0]],                       base:8,  color:'#8aa860', ring:{speed:150,arc:70,hits:1}, hint:'Clings to the fronds. Barely fights.'},
+  wrasse:   {name:'Emerald Wrasse',  icon:'🐠', biome:'kelp', hours:[6,19],  weather:null,  rar:'common',   cells:[[0,0],[1,0]],                 base:12, color:'#5ec87a', ring:{speed:200,arc:62,hits:1}, hint:'A green flash between the stalks.'},
+  pike:     {name:'Thornback Pike',  icon:'🐟', biome:'kelp', hours:[16,21], weather:null,  rar:'uncommon', cells:[[0,0],[0,1],[0,2],[0,3]],     base:28, color:'#6a8a70', ring:{speed:270,arc:50,hits:2}, hint:'Hunts the kelp edge as the light dies.'},
+  cuttle:   {name:'Ink Cuttle',      icon:'🦑', biome:'kelp', hours:[19,5],  weather:null,  rar:'uncommon', cells:[[0,0],[0,1],[1,0],[1,1]],     base:30, color:'#9a7ab8', ring:{speed:230,arc:52,hits:2}, hint:'Night water, kelp shadow, a cloud of ink if you miss.'},
+  barnacle: {name:'Old Barnacle',    icon:'🐚', biome:'kelp', hours:[6,19],  weather:'overcast',rar:'rare', cells:[[0,0],[0,1],[0,2],[1,1]],     base:55, color:'#b8a890', ring:{speed:200,arc:46,hits:3}, hint:'A grey day over the kelp, and patience.'},
+  // — the coral reefs —
+  darter:   {name:'Coral Darter',    icon:'🐠', biome:'reef', hours:[6,19],  weather:null,  rar:'common',   cells:[[0,0]],                       base:9,  color:'#e88a6a', ring:{speed:210,arc:66,hits:1}, hint:'Quick color over the bright coral.'},
+  parrot:   {name:'Parrot Snapper',  icon:'🐠', biome:'reef', hours:[6,19],  weather:null,  rar:'common',   cells:[[0,0],[1,0]],                 base:14, color:'#5ac8b8', ring:{speed:220,arc:60,hits:1}, hint:'You can hear it crunching coral from the boat.'},
+  angelfish:{name:'Banded Angelfish',icon:'🐠', biome:'reef', hours:[8,17],  weather:'clear',rar:'uncommon',cells:[[0,0],[0,1]],                 base:24, color:'#e8c84a', ring:{speed:260,arc:52,hits:2}, hint:'Vain thing. Shows itself only in full sun.'},
+  shrimp:   {name:'Fire Shrimp',     icon:'🦐', biome:'reef', hours:[16,23], weather:null,  rar:'common',   cells:[[0,0]],                       base:13, color:'#e86a4a', ring:{speed:180,arc:64,hits:1}, hint:'Embers of the reef, lit at dusk.'},
+  loach:    {name:'Lion Loach',      icon:'🐡', biome:'reef', hours:[21,4],  weather:null,  rar:'uncommon', cells:[[0,0],[0,1],[1,0],[1,1]],     base:36, color:'#c87a4a', ring:{speed:270,arc:50,hits:2}, hint:'Prowls the coral by lamplight.'},
+  oyster:   {name:'Pearl Oyster',    icon:'🦪', biome:'reef', hours:[8,16],  weather:'clear',rar:'rare',    cells:[[0,0]],                       base:70, color:'#e8e0d8', ring:{speed:150,arc:40,hits:3}, hint:'Calm, clear, bright — and even then, mostly grit.'},
+  // — the Deeps (a longline reaches where rods cannot) —
+  cod:      {name:'Slate Cod',       icon:'🐟', biome:'deep', hours:[6,19],  weather:null,  rar:'common',   cells:[[0,0],[0,1],[1,0],[1,1]],     base:26, color:'#7a8896', ring:{speed:200,arc:58,hits:2}, hint:'The honest workhorse of the fathomless water.'},
+  hake:     {name:'Silver Hake',     icon:'🐟', biome:'deep', hours:[19,6],  weather:null,  rar:'common',   cells:[[0,0],[0,1],[0,2]],           base:24, color:'#a8b8c4', ring:{speed:220,arc:56,hits:2}, hint:'Climbs from the dark when the sun is gone.'},
+  fathom:   {name:'Fathom Eel',      icon:'🐍', biome:'deep', hours:[20,5],  weather:null,  rar:'uncommon', cells:[[0,0],[0,1],[0,2],[0,3]],     base:44, color:'#5a6a8a', ring:{speed:280,arc:48,hits:2}, hint:'Longer than your gunwale. Night, and deep.'},
+  ghostray: {name:'Ghost Ray',       icon:'🐡', biome:'deep', hours:[16,21], weather:null,  rar:'uncommon', cells:[[0,0],[0,1],[0,2],[1,1]],     base:52, color:'#c8d4e0', ring:{speed:260,arc:46,hits:2}, hint:'A pale wing in the twilight water.'},
+  lanternf: {name:'Abyss Lantern',   icon:'🏮', biome:'deep', hours:[21,4],  weather:'rain',rar:'rare',     cells:[[0,0],[1,0]],                 base:80, color:'#e8d47a', ring:{speed:290,arc:44,hits:3}, hint:'A light below in the rain-dark deep. Follow it carefully.'},
+  king:     {name:'Sunless King',    icon:'👑', biome:'deep', hours:[21,4],  weather:'overcast',rar:'rare', cells:[[0,0],[0,1],[0,2],[1,0],[1,1],[1,2]], base:110, color:'#4a5a7a', ring:{speed:310,arc:42,hits:3}, hint:'Starless night, clouded sky, the deepest water. The throne is patient.'},
 };
 const CURIO_HINT = 'Sealed bottles turn up where the currents fold.';
 const LORE_NOTES = [
@@ -304,6 +331,7 @@ const S = {
   dockedAt:null, pieceSeq:1, contractSeq:1,
   muted:false, leviathanTonight:false, lastRegenDay:0,
   settings:{vol:0.8, music:true, post:true, sway:true, sharp:'balanced'},
+  omens:{aurora:false, rainbow:false, dolphins:false, deepHint:false},
 };
 let titleMode=true, paused=false;
 
@@ -315,7 +343,7 @@ function save(){
     holdW:S.holdW, holdH:S.holdH, pieces:S.pieces, contracts:S.contracts, accepted:S.accepted,
     codex:S.codex, curios:S.curios, notesRead:S.notesRead, leviathanSeen:S.leviathanSeen,
     boat:{x:S.boat.x,z:S.boat.z,heading:S.boat.heading}, pieceSeq:S.pieceSeq, contractSeq:S.contractSeq, lastRegenDay:S.lastRegenDay,
-    settings:S.settings,
+    settings:S.settings, omens:S.omens,
   })); }catch(e){}
 }
 function loadSave(){
@@ -328,6 +356,8 @@ function loadSave(){
       lastRegenDay:d.lastRegenDay||d.day});
     S.boat.x=d.boat.x; S.boat.z=d.boat.z; S.boat.heading=d.boat.heading; S.boat.speed=0;
     S.settings=Object.assign({vol:0.8, music:true, post:true, sway:true, sharp:'balanced'}, d.settings||{});
+    S.omens=Object.assign({aurora:false, rainbow:false, dolphins:false, deepHint:false}, d.omens||{});
+    S.upgrades=Object.assign({engine:false,lamps:false,hold:false,icebox:false,lures:false,ledger:false,silent:false,longline:false,hold2:false}, d.upgrades||{});
     return true;
   }catch(e){ return false; }
 }
@@ -557,7 +587,7 @@ const waterUni = {
   uSunCol:{value:new THREE.Color().setRGB(1,0.9,0.7)},
   uFogColor:{value:new THREE.Color().setRGB(0.07,0.10,0.13)},
   uFogNear:{value:60}, uFogFar:{value:420}, uCam:{value:new THREE.Vector3()},
-  uIsles:{value:Array.from({length:8},()=>new THREE.Vector3())}, uIsleCount:{value:0},
+  uIsles:{value:Array.from({length:12},()=>new THREE.Vector3())}, uIsleCount:{value:0},
   uShallow:{value:new THREE.Color().setRGB(0.10,0.30,0.32)}, uDayness:{value:1},
 };
 // flat plane — vertex displacement on a big plane aliases into moire; waves live in fragment normals
@@ -572,7 +602,7 @@ const water = new THREE.Mesh(new THREE.PlaneGeometry(1700,1700,1,1), new THREE.S
     }`,
   fragmentShader:`
     uniform float uTime,uFogNear,uFogFar; uniform vec3 uSunDir,uWater,uHorizon,uSunCol,uFogColor,uCam;
-    uniform vec3 uIsles[8]; uniform int uIsleCount; uniform vec3 uShallow; uniform float uDayness;
+    uniform vec3 uIsles[12]; uniform int uIsleCount; uniform vec3 uShallow; uniform float uDayness;
     varying vec3 vW;
     float wh(vec2 p,float t){ return 0.18*sin(0.075*p.x+0.055*p.y+t*0.85)+0.11*sin(0.105*p.x+0.040*p.y+t*1.35)+0.06*sin(0.17*p.x+0.12*p.y+t*2.2); }
     void main(){
@@ -603,7 +633,7 @@ const water = new THREE.Mesh(new THREE.PlaneGeometry(1700,1700,1,1), new THREE.S
       col = mix(col, uHorizon*1.05, fres*0.72);
       // shallow turquoise grade around islands, with a faint foam-froth band at the shore
       float sh = 0.0;
-      for(int i=0;i<8;i++){
+      for(int i=0;i<12;i++){
         if(i>=uIsleCount) break;
         float dd = distance(vW.xz, uIsles[i].xy);
         sh = max(sh, 1.0-smoothstep(uIsles[i].z*0.85, uIsles[i].z+26.0, dd));
@@ -618,7 +648,7 @@ water.rotation.x = -Math.PI/2;
 scene.add(water);
 
 // ---------- world generation ----------
-const islands=[]; const kelpPatches=[]; const zones=[];
+const islands=[]; const kelpPatches=[]; const reefPatches=[]; const deepZones=[]; const zones=[];
 function genWorld(){
   const R = mulberry32(worldSeed);
   const names = [...ISLE_NAMES];
@@ -638,9 +668,28 @@ function genWorld(){
     const kx = a.x+(b.x-a.x)*t + (R()-0.5)*50, kz = a.z+(b.z-a.z)*t + (R()-0.5)*50;
     kelpPatches.push({x:kx, z:kz, r:26+R()*10});
   }
+  // coral reefs hug the outer shallows of two islands
+  for(let i=0;i<2;i++){
+    const isl=islands[1+i];
+    const a=R()*Math.PI*2;
+    reefPatches.push({x:isl.x+Math.cos(a)*(isl.r+26), z:isl.z+Math.sin(a)*(isl.r+26), r:16+R()*6});
+  }
+  // and the Deeps wait out in open water
+  for(let i=0;i<2;i++){
+    let dx,dz,ok=false;
+    for(let t=0;t<30 && !ok;t++){
+      const a=R()*Math.PI*2, d=110+R()*180;
+      dx=Math.cos(a)*d; dz=Math.sin(a)*d;
+      ok = islands.every(o=>Math.hypot(dx-o.x,dz-o.z)>o.r+55) && kelpPatches.every(k=>Math.hypot(dx-k.x,dz-k.z)>k.r+30)
+        && reefPatches.every(k=>Math.hypot(dx-k.x,dz-k.z)>k.r+30) && deepZones.every(k=>Math.hypot(dx-k.x,dz-k.z)>80);
+    }
+    if(ok) deepZones.push({x:dx, z:dz, r:26+R()*8});
+  }
   // fishing zones
   for(const isl of islands) zones.push({x:isl.x, z:isl.z, inner:isl.r+8, outer:isl.r+34, biome:'sand', shadows:[]});
   for(const k of kelpPatches) zones.push({x:k.x, z:k.z, inner:0, outer:k.r, biome:'kelp', shadows:[]});
+  for(const k of reefPatches) zones.push({x:k.x, z:k.z, inner:0, outer:k.r, biome:'reef', shadows:[]});
+  for(const k of deepZones) zones.push({x:k.x, z:k.z, inner:0, outer:k.r, biome:'deep', shadows:[]});
 }
 
 // canvas micro-textures — speckle and grain kill the flat-vinyl look up close
@@ -978,10 +1027,38 @@ function buildIslands(){
     }
     outcrops.push({x:ox, z:oz, r:3.4});
   }
-  // shallow tint lives in the water shader — feed it island + outcrop footprints
+  // coral reefs — bright discs studded with color, alive with darters
+  for(const rf of reefPatches){
+    const R3=mulberry32((rf.x*7+rf.z*11)|0);
+    const disc=new THREE.Mesh(new THREE.CircleGeometry(rf.r,32),
+      new THREE.MeshBasicMaterial({color:0x35c8b8,transparent:true,opacity:0.14,depthWrite:false}));
+    disc.rotation.x=-Math.PI/2; disc.position.set(rf.x,0.40,rf.z); scene.add(disc);
+    const coralCols=[0xe86a5a,0xe8a04a,0xb85ac8,0x5ac8b8,0xe8d05a];
+    for(let i=0;i<22;i++){
+      const a=R3()*Math.PI*2, rr=Math.sqrt(R3())*rf.r*0.85;
+      const cM=new THREE.MeshStandardMaterial({color:coralCols[(R3()*coralCols.length)|0],roughness:0.9,
+        emissive:new THREE.Color(coralCols[(R3()*coralCols.length)|0]).multiplyScalar(0.06)});
+      landMats.push(cM);
+      const c=new THREE.Mesh(R3()<0.5?new THREE.IcosahedronGeometry(0.22+R3()*0.3,0):new THREE.ConeGeometry(0.16+R3()*0.12,0.5+R3()*0.5,5), cM);
+      c.position.set(rf.x+Math.cos(a)*rr, 0.15+R3()*0.25, rf.z+Math.sin(a)*rr);
+      c.rotation.set(R3()*0.6,R3()*3,R3()*0.6);
+      scene.add(c);
+    }
+  }
+  // the Deeps — dark fathomless water, marked with a lone buoy
+  for(const dz of deepZones){
+    const disc=new THREE.Mesh(new THREE.CircleGeometry(dz.r,36),
+      new THREE.MeshBasicMaterial({color:0x040e1a,transparent:true,opacity:0.34,depthWrite:false}));
+    disc.rotation.x=-Math.PI/2; disc.position.set(dz.x,0.36,dz.z); scene.add(disc);
+    const rim=new THREE.Mesh(new THREE.RingGeometry(dz.r*0.96,dz.r*1.02,36),
+      new THREE.MeshBasicMaterial({color:0x2a4a6a,transparent:true,opacity:0.22,depthWrite:false}));
+    rim.rotation.x=-Math.PI/2; rim.position.set(dz.x,0.42,dz.z); scene.add(rim);
+  }
+  // shallow tint lives in the water shader — feed it island + outcrop + reef footprints
   islands.forEach((isl,i)=>{ waterUni.uIsles.value[i].set(isl.x, isl.z, isl.r); });
   outcrops.forEach((o,i)=>{ waterUni.uIsles.value[islands.length+i].set(o.x, o.z, 5); });
-  waterUni.uIsleCount.value = islands.length + outcrops.length;
+  reefPatches.forEach((rf,i)=>{ waterUni.uIsles.value[islands.length+outcrops.length+i].set(rf.x, rf.z, rf.r*0.55); });
+  waterUni.uIsleCount.value = islands.length + outcrops.length + reefPatches.length;
   // channel buoys — one off each dock approach, one warning off each outcrop
   const buoyBodyMat = new THREE.MeshStandardMaterial({color:0xd8d2c4,roughness:0.8});
   const buoyRedMat = new THREE.MeshStandardMaterial({color:0xb8402e,roughness:0.8});
@@ -1002,6 +1079,7 @@ function buildIslands(){
     addBuoy(isl.x+Math.cos(da+0.35)*(isl.r+20), isl.z+Math.sin(da+0.35)*(isl.r+20));
   }
   for(const o of outcrops) addBuoy(o.x+6.5, o.z+3);
+  for(const dz of deepZones) addBuoy(dz.x+dz.r*0.9, dz.z+2);
   // kelp — a swaying forest with a floating canopy, not an oil slick
   for(const k of kelpPatches){
     const R2 = mulberry32((k.x*13+k.z*7)|0);
@@ -1650,6 +1728,7 @@ function spawnDolphins(){
   }
   toast('Dolphins off the bow!');
   cinema(8);
+  if(!S.omens.dolphins){ S.omens.dolphins=true; renderCodex(); save(); }
 }
 function updateDolphins(dt){
   const spd=Math.abs(S.boat.speed), maxV=S.upgrades.engine?11.5:8;
@@ -1779,7 +1858,8 @@ function updateAurora(dt,night){
     p.scale.y=1+0.12*Math.sin(t*0.22+p.userData.ph);
   }
   auroraGroup.position.set(camera.position.x,0,camera.position.z);
-  if(on && !auroraToastDone){ auroraToastDone=true; toast('The sky is awake tonight.', true); cinema(9); }
+  if(on && !auroraToastDone){ auroraToastDone=true; toast('The sky is awake tonight.', true); cinema(9);
+    if(!S.omens.aurora){ S.omens.aurora=true; renderCodex(); save(); } }
   if(!on) auroraToastDone=false;
 }
 let rainbow=null, rainbowT=0;
@@ -1799,6 +1879,7 @@ function updateRainbow(dt){
   const target=(rainbowT>0 && lastDayness>0.25 && S.weather!=='rain') ? Math.min(1, rainbowT/6, (40-rainbowT)/3) : 0;
   rainbow.visible=target>0.01;
   if(!rainbow.visible) return;
+  if(!S.omens.rainbow){ S.omens.rainbow=true; renderCodex(); save(); }
   const sa=((S.hour-6)/12)*Math.PI;
   const az=Math.atan2(-0.45, Math.cos(sa)*0.8)+Math.PI;
   rainbow.position.set(S.boat.x+Math.cos(az)*430, -26, S.boat.z+Math.sin(az)*430);
@@ -1985,6 +2066,17 @@ function updateLife(dt){
   updateTufts();
   updateGlints(dt);
   updateBeachGulls(dt);
+  // first brush with the fathomless water
+  if(!S.omens.deepHint && !S.upgrades.longline && S.mode==='sail'){
+    for(const dz of deepZones){
+      if(Math.hypot(S.boat.x-dz.x, S.boat.z-dz.z) < dz.r+8){
+        S.omens.deepHint=true;
+        toast('The water turns fathomless here. Whatever swims below is beyond your line — for now.', true);
+        save();
+        break;
+      }
+    }
+  }
   // kelp minnows
   for(const kf of kelpFish){
     kf.ang+=kf.spd*dt;
@@ -2177,7 +2269,8 @@ function updateShadows(dt){
         if(z.inner>0 && d<z.inner){ sh.dir=Math.atan2(dz,dx)+(Math.random()-0.5); }
         // flee check
         const bd = Math.hypot(S.boat.x-sh.x, S.boat.z-sh.z);
-        if(sh.species!=='bottle' && ((bd<13 && Math.abs(S.boat.speed)>4.2) || bd<3.2)) sh.state='flee';
+        const fleeSpd=S.upgrades.silent?6.2:4.2, fleeD=S.upgrades.silent?2.2:3.2;
+        if(sh.species!=='bottle' && ((bd<13 && Math.abs(S.boat.speed)>fleeSpd) || bd<fleeD)) sh.state='flee';
       } else if(sh.state==='flee'){
         const ang = Math.atan2(sh.z-S.boat.z, sh.x-S.boat.x);
         sh.x += Math.cos(ang)*7*dt; sh.z += Math.sin(ang)*7*dt;
@@ -2551,7 +2644,7 @@ function freshness(p){
 }
 function fishPrice(p){
   const sp=SPECIES[p.species];
-  return Math.round(sp.base*(0.72+0.55*freshness(p)));
+  return Math.round(sp.base*(0.72+0.55*freshness(p))*(S.upgrades.ledger?1.1:1));
 }
 const CELL=47; // 44 + 3 gap
 let holdUI={holding:null, ghostRot:0, container:null, onPlace:null, hoverCell:null};
@@ -2653,7 +2746,7 @@ function startFishing(target){
     ring.species=null; ring.speed=140; ring.arcW=85; ring.need=1;
   } else {
     const sp=SPECIES[id];
-    ring.species=id; ring.speed=sp.ring.speed; ring.arcW=sp.ring.arc; ring.need=sp.ring.hits;
+    ring.species=id; ring.speed=sp.ring.speed; ring.arcW=sp.ring.arc*(S.upgrades.lures?1.25:1); ring.need=sp.ring.hits;
   }
   ring.hits=0; ring.needle=Math.random()*360; ring.dir=1;
   ring.arcStart=Math.random()*360;
@@ -2917,21 +3010,29 @@ function renderDockBody(isl){
   }
   else if(dockTab==='shipwright'){
     const UP=[
-      {key:'engine', name:'Tuned Engine', icon:'⚙️', cost:140, desc:'A sweeter note and a faster hull. +45% speed.'},
-      {key:'lamps',  name:'Deck Lamps',   icon:'🏮', cost:160, desc:'Fish shadows show near the boat after dark. Night opens up.'},
-      {key:'hold',   name:'Hold Expansion', icon:'🧰', cost:220, desc:'Rebuild the hold — 4×3 becomes 5×4.'},
+      {key:'engine',  name:'Tuned Engine',   icon:'⚙️', cost:140, desc:'A sweeter note and a faster hull. +45% speed.'},
+      {key:'lamps',   name:'Deck Lamps',     icon:'🏮', cost:160, desc:'Fish shadows show near the boat after dark. Night opens up.'},
+      {key:'hold',    name:'Hold Expansion', icon:'🧰', cost:220, desc:'Rebuild the hold — 4×3 becomes 5×4.'},
+      {key:'icebox',  name:'Ice Box',        icon:'🧊', cost:180, desc:'Packed ice. The catch stays fresh twice as long.'},
+      {key:'lures',   name:'Patient Lures',  icon:'🪝', cost:200, desc:'Hand-tied and irresistible. The catch window widens.'},
+      {key:'ledger',  name:'Market Ledger',  icon:'📒', cost:150, desc:'Know every price in the islands. Fish sell +10%.'},
+      {key:'silent',  name:'Silent Prop',    icon:'🌀', cost:240, desc:'Barely a ripple. Fish let you drift much closer.'},
+      {key:'longline',name:'Longline Rig',   icon:'🎣', cost:260, desc:'Reaches the fathomless water. The Deeps open up.'},
+      {key:'hold2',   name:'Great Hold',     icon:'🗄️', cost:420, desc:'Tear out the bulkheads — 5×4 becomes 6×5.', needs:'hold'},
     ];
     for(const u of UP){
       const owned=S.upgrades[u.key];
+      const locked=u.needs && !S.upgrades[u.needs];
       const row=document.createElement('div'); row.className='row';
-      row.innerHTML=`<div class="info"><div class="name">${u.icon} ${u.name}</div><div class="meta">${u.desc}</div></div>
+      row.innerHTML=`<div class="info"><div class="name">${u.icon} ${u.name}</div><div class="meta">${locked?'needs the Hold Expansion first':u.desc}</div></div>
         <div class="price">${owned?'owned':'$'+u.cost}</div>`;
       const b=document.createElement('button'); b.className='btn'; b.textContent=owned?'✓':'Buy';
-      b.disabled=owned||S.money<u.cost;
+      b.disabled=owned||locked||S.money<u.cost;
       b.addEventListener('click',()=>{
-        if(S.money<u.cost) return;
+        if(S.money<u.cost||locked) return;
         S.money-=u.cost; S.upgrades[u.key]=true; sfxCoin();
         if(u.key==='hold'){ S.holdW=5; S.holdH=4; }
+        if(u.key==='hold2'){ S.holdW=6; S.holdH=5; }
         toast(`${u.name} installed.`);
         updateHUD(); renderDockBody(isl); save();
       });
@@ -2985,12 +3086,27 @@ function renderCodex(){
     <div><div class="cname">${S.curios?'Bottled notes':'???'}</div><div class="chint">${CURIO_HINT}</div></div>
     ${S.curios?`<div class="count">×${S.curios}</div>`:''}`;
   g.appendChild(cc);
-  // leviathan
-  const lv=document.createElement('div'); lv.className='codex-card'+(S.leviathanSeen?'':' unknown');
-  lv.innerHTML=`<div class="codex-sil" style="background:${S.leviathanSeen?'#2a3c5033':'rgba(242,233,216,0.06)'}">${S.leviathanSeen?'🌊':'❔'}</div>
-    <div><div class="cname">${S.leviathanSeen?'Something vast':'???'}</div>
-    <div class="chint">${S.leviathanSeen?'It passed beneath you on a still night, and meant no harm.':'The old notes speak of still nights, far from shore.'}</div></div>`;
-  g.appendChild(lv);
+  // skies & omens
+  const hdr=document.createElement('div');
+  hdr.style.cssText='grid-column:1/-1;font-size:13px;color:var(--gold);letter-spacing:0.08em;margin-top:10px;font-style:italic;';
+  hdr.textContent='Skies & Omens';
+  g.appendChild(hdr);
+  const OMENS=[
+    {seen:S.leviathanSeen, icon:'🌊', name:'Something vast',
+      seenHint:'It passed beneath you on a still night, and meant no harm.', hidden:'The old notes speak of still nights, far from shore.'},
+    {seen:S.omens.aurora, icon:'🌌', name:'The sky, awake',
+      seenHint:'Green curtains over black water. You were there.', hidden:'Once in a while, on the clearest nights, they say the sky forgets itself.'},
+    {seen:S.omens.dolphins, icon:'🐬', name:'Company at the bow',
+      seenHint:'They raced you, and won, and did not gloat much.', hidden:'Run flat out through open water and see who joins you.'},
+    {seen:S.omens.rainbow, icon:'🌈', name:'The rain\'s apology',
+      seenHint:'It hung over the islands for a little while, and asked nothing.', hidden:'Every rain ends. Watch what it leaves.'},
+  ];
+  for(const o of OMENS){
+    const card=document.createElement('div'); card.className='codex-card'+(o.seen?'':' unknown');
+    card.innerHTML=`<div class="codex-sil" style="background:${o.seen?'#2a3c5033':'rgba(242,233,216,0.06)'}">${o.seen?o.icon:'❔'}</div>
+      <div><div class="cname">${o.seen?o.name:'???'}</div><div class="chint">${o.seen?o.seenHint:o.hidden}</div></div>`;
+    g.appendChild(card);
+  }
   $('codex-sub').textContent=`${caught} of ${Object.keys(SPECIES).length} species logged`;
 }
 
@@ -3082,7 +3198,13 @@ addEventListener('keydown',(e)=>{
       const isl=nearDock();
       if(isl && Math.abs(S.boat.speed)<3){ openDock(isl); return; }
       const t=nearestShadow(9);
-      if(t && Math.abs(S.boat.speed)<2.5){ startFishing(t); return; }
+      if(t && Math.abs(S.boat.speed)<2.5){
+        if(t.zone.biome==='deep' && !S.upgrades.longline){
+          toast('Your line won\'t reach the deep swimmers — the shipwright sells a Longline Rig.');
+          return;
+        }
+        startFishing(t); return;
+      }
     }
     return;
   }
@@ -3286,9 +3408,11 @@ setInterval(()=>{
 // ---------- title / boot ----------
 function initFreshState(){
   worldSeed=(Math.random()*1e9)|0;
-  Object.assign(S,{day:1,hour:6.5,weather:'clear',money:40,upgrades:{engine:false,lamps:false,hold:false},
+  Object.assign(S,{day:1,hour:6.5,weather:'clear',money:40,
+    upgrades:{engine:false,lamps:false,hold:false,icebox:false,lures:false,ledger:false,silent:false,longline:false,hold2:false},
     holdW:4,holdH:3,pieces:[],contracts:[],accepted:[],codex:{},curios:0,notesRead:[],leviathanSeen:false,
-    pieceSeq:1,contractSeq:1,lastRegenDay:1});
+    pieceSeq:1,contractSeq:1,lastRegenDay:1,
+    omens:{aurora:false, rainbow:false, dolphins:false, deepHint:false}});
 }
 function buildAll(){
   genWorld(); buildIslands(); buildBoat(); buildRain(); buildGulls();
@@ -3381,7 +3505,8 @@ window.__dbg={
   state(){ return {mode:S.mode, day:S.day, hour:S.hour.toFixed(2), weather:S.weather, money:S.money,
     pieces:S.pieces.length, shadows:zones.reduce((s,z)=>s+z.shadows.length,0), boat:{x:S.boat.x|0,z:S.boat.z|0},
     islands:islands.map(i=>({name:i.name,x:i.x|0,z:i.z|0}))}; },
-  zones(){ return zones.map(z=>({biome:z.biome,x:z.x|0,z:z.z|0,n:z.shadows.length,species:z.shadows.map(s=>s.species)})); },
+  zones(){ return zones.map(z=>({biome:z.biome,x:z.x|0,z:z.z|0,n:z.shadows.length,species:z.shadows.map(s=>s.species),
+    pts:z.shadows.map(s=>[s.x|0,s.z|0])})); },
 };
 </script>
 </body>

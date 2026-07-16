@@ -336,6 +336,7 @@ const SPECIES = {
   ghostray: {name:'Ghost Ray',       icon:'🐡', biome:'deep', hours:[16,21], weather:null,  rar:'uncommon', cells:[[0,0],[0,1],[0,2],[1,1]],     base:52, color:'#c8d4e0', ring:{speed:260,arc:46,hits:2}, hint:'A pale wing in the twilight water.'},
   lanternf: {name:'Abyss Lantern',   icon:'🏮', biome:'deep', hours:[21,4],  weather:'rain',rar:'rare',     cells:[[0,0],[1,0]],                 base:80, color:'#e8d47a', ring:{speed:290,arc:44,hits:3}, hint:'A light below in the rain-dark deep. Follow it carefully.'},
   king:     {name:'Sunless King',    icon:'👑', biome:'deep', hours:[21,4],  weather:'overcast',rar:'rare', cells:[[0,0],[0,1],[0,2],[1,0],[1,1],[1,2]], base:110, color:'#4a5a7a', ring:{speed:310,arc:42,hits:3}, hint:'Starless night, clouded sky, the deepest water. The throne is patient.'},
+  gloamfin: {name:'Gloamfin',        icon:'✨', biome:'grotto',hours:[17,7], weather:null,  rar:'rare',     cells:[[0,0],[0,1]],                 base:64, color:'#6ae0d0', ring:{speed:260,arc:46,hits:3}, hint:'It lives in the sea\'s one quiet room, and nowhere else.'},
 };
 const CURIO_HINT = 'Sealed bottles turn up where the currents fold.';
 const LORE_NOTES = [
@@ -362,7 +363,7 @@ const S = {
   settings:{vol:0.8, music:true, post:true, sway:true, sharp:'balanced'},
   omens:{aurora:false, rainbow:false, dolphins:false, deepHint:false},
   hull:100, stats:{sold:0, delivered:0}, questIdx:0,
-  folk:{}, paint:{hull:'#24525a', cabin:'#bdae8f', trim:'#523b24', glass:'warm'},
+  folk:{}, paint:{hull:'#24525a', cabin:'#bdae8f', trim:'#523b24', glass:'warm', wake:'classic'},
 };
 let titleMode=true, paused=false;
 
@@ -394,7 +395,7 @@ function loadSave(){
     S.stats=Object.assign({sold:0,delivered:0}, d.stats||{});
     S.questIdx=d.questIdx||0;
     S.folk=d.folk||{};
-    S.paint=Object.assign({hull:'#24525a', cabin:'#bdae8f', trim:'#523b24', glass:'warm'}, d.paint||{});
+    S.paint=Object.assign({hull:'#24525a', cabin:'#bdae8f', trim:'#523b24', glass:'warm', wake:'classic'}, d.paint||{});
     return true;
   }catch(e){ return false; }
 }
@@ -743,7 +744,7 @@ function genWorld(){
     const farFrom=(s)=>!s||Math.hypot(x-s.x,z-s.z)>60;
     if(clearOf(x,z,36) && farFrom(wreckSite) && farFrom(springSite)) grottoSite={x, z, ang:R()*Math.PI*2};
   }
-  if(grottoSite) zones.push({x:grottoSite.x, z:grottoSite.z, inner:0, outer:7, biome:'sand', wreck:true, shadows:[]});
+  if(grottoSite) zones.push({x:grottoSite.x, z:grottoSite.z, inner:0, outer:7, biome:'grotto', grotto:true, wreck:true, shadows:[]});
   // fishing zones
   for(const isl of islands) zones.push({x:isl.x, z:isl.z, inner:isl.r+8, outer:isl.r+34, biome:'sand', shadows:[]});
   if(wreckSite) zones.push({x:wreckSite.x, z:wreckSite.z, inner:0, outer:15, biome:'sand', wreck:true, shadows:[]});
@@ -788,7 +789,7 @@ let lightHouseLamp=null;
 const windowMats=[], dockLights=[], landMats=[], buoyMats=[], buoys=[], outcrops=[], kelpFronds=[], kelpPads=[];
 const flags=[], chimneys=[], villagers=[], windowPoolMats=[], beachGulls=[], kelpFish=[], spinners=[];
 const festMats=[], festLanterns=[];
-let festGroup=null, festToastDone=false;
+let festGroup=null, festGroup2=null, festToastDone=false, harvToastDone=false, harvestToday=false;
 let windDir=0, auroraTonight=false, duskTintR=1, duskTintB=1;
 function refreshDaily(){
   const Rd=mulberry32(worldSeed+S.day*577);
@@ -800,8 +801,10 @@ function refreshDaily(){
   duskTintB = 1+Math.max(0,-shift)*2.2;
   marketIslName = (S.day%3===2 && islands.length) ? islands[(Rd()*islands.length)|0].name : null;
   festToday = S.day%7===6;
-  festToastDone=false;
+  harvestToday = S.day%7===3;
+  festToastDone=false; harvToastDone=false;
   if(festGroup) festGroup.visible=festToday;
+  if(festGroup2) festGroup2.visible=harvestToday;
 }
 // push dome vertices around radially so islands stop being perfect spheres
 function bumpy(geo, amp, seed){
@@ -1030,6 +1033,49 @@ function buildIslands(){
         cot.position.x + lx*Math.cos(rotY) + lz*Math.sin(rotY),
         cot.position.y + 3.05*1.7,
         cot.position.z - lx*Math.sin(rotY) + lz*Math.cos(rotY)));
+    }
+    // harvest rigging at the windmill isle — gold bunting, pumpkins and hay, every seventh day
+    if(islands.indexOf(isl)===2){
+      festGroup2=new THREE.Group();
+      const hCols=[0xffc84a,0xff9a4a,0xe8e05a];
+      for(let s=0;s<2;s++){
+        const aA=dockAng+0.18+s*0.42, aB=aA+0.36;
+        const rA=isl.r*0.52;
+        const pA=new THREE.Vector3(isl.x+Math.cos(aA)*rA, groundY(isl,rA)+3.0, isl.z+Math.sin(aA)*rA);
+        const pB=new THREE.Vector3(isl.x+Math.cos(aB)*rA, groundY(isl,rA)+3.0, isl.z+Math.sin(aB)*rA);
+        const pts=[];
+        for(let i=0;i<=6;i++){
+          const u=i/6;
+          const p=pA.clone().lerp(pB,u); p.y-=Math.sin(Math.PI*u)*0.8;
+          pts.push(p);
+          if(i>0&&i<6){
+            const lm=new THREE.MeshStandardMaterial({color:hCols[i%3], emissive:hCols[i%3], emissiveIntensity:0.3});
+            festMats.push(lm);
+            const lant=new THREE.Mesh(new THREE.SphereGeometry(0.15,8,6), lm);
+            lant.position.copy(p); lant.position.y-=0.16;
+            festGroup2.add(lant);
+          }
+        }
+        festGroup2.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts),
+          new THREE.LineBasicMaterial({color:0x2a2018,transparent:true,opacity:0.7})));
+      }
+      const hayMat=new THREE.MeshStandardMaterial({color:0xc8a84a,roughness:1,emissive:new THREE.Color().setRGB(0.06,0.05,0.02)});
+      const pumpMat=new THREE.MeshStandardMaterial({color:0xd87a2a,roughness:0.9,emissive:new THREE.Color().setRGB(0.05,0.025,0.008)});
+      const hAng=dockAng+0.5, hR=isl.r*0.48;
+      for(let i=0;i<2;i++){
+        const hay=new THREE.Mesh(new THREE.BoxGeometry(1.4,0.9,0.9), hayMat);
+        hay.position.set(isl.x+Math.cos(hAng)*hR+i*1.6-0.8, groundY(isl,hR)+0.35, isl.z+Math.sin(hAng)*hR+i*0.5);
+        hay.rotation.y=i*0.7; festGroup2.add(hay);
+      }
+      for(let i=0;i<4;i++){
+        const pk=new THREE.Mesh(new THREE.SphereGeometry(0.3+((i*3)%2)*0.12,8,6), pumpMat);
+        pk.scale.y=0.75;
+        pk.position.set(isl.x+Math.cos(hAng+0.14)*hR+i*0.5-1, groundY(isl,hR)+0.22, isl.z+Math.sin(hAng+0.14)*hR-1+i*0.4);
+        festGroup2.add(pk);
+      }
+      festGroup2.visible=false;
+      setCast(festGroup2);
+      scene.add(festGroup2);
     }
     // town landmark — each island has its own trade
     {
@@ -1426,6 +1472,14 @@ const boat = new THREE.Group();
 let lanternMesh=null, boatLamp=null, blobShadow=null;
 const boatMats={};
 const GLASS_TINTS={warm:0xffc860, rose:0xff8aa0, seaglass:0x9affc8};
+const WAKE_COLORS={
+  classic:{ribbon:[0.88,0.93,0.95], puff:0xdfeaf0, label:'#e0eaf0'},
+  gold:{ribbon:[1.0,0.86,0.55], puff:0xffe2a8, label:'#ffd98a'},
+  seafoam:{ribbon:[0.62,0.95,0.82], puff:0xaaf0d8, label:'#9ef2ce'},
+  moonlight:{ribbon:[0.66,0.78,1.0], puff:0xb8d0ff, label:'#aac6ff'},
+  rose:{ribbon:[1.0,0.74,0.80], puff:0xffc2cc, label:'#ffb8c4'},
+};
+let wakePuffColor=0xdfeaf0;
 function applyPaint(){
   if(!boatMats.top) return;
   boatMats.top.color.set(S.paint.hull);
@@ -1434,6 +1488,9 @@ function applyPaint(){
   const gt=GLASS_TINTS[S.paint.glass]||GLASS_TINTS.warm;
   boatMats.lantern.emissive.set(gt); boatMats.lantern.color.set(gt);
   boatMats.lamp.color.set(gt);
+  const wc=WAKE_COLORS[S.paint.wake]||WAKE_COLORS.classic;
+  ribbonUni.uCol.value.setRGB(wc.ribbon[0],wc.ribbon[1],wc.ribbon[2]);
+  wakePuffColor=wc.puff;
 }
 function buildBoat(){
   const topMat = new THREE.MeshStandardMaterial({color:new THREE.Color().setRGB(0.14,0.32,0.34),roughness:0.75,side:THREE.DoubleSide});
@@ -1535,7 +1592,7 @@ function spawnWake(){
   const back = 2.4;
   const px = Math.cos(S.boat.heading), pz = -Math.sin(S.boat.heading);
   for(const side of [-1,1]){
-    const m = new THREE.Mesh(wakeGeo, new THREE.MeshBasicMaterial({color:0xdfeaf0,transparent:true,opacity:0.15,depthWrite:false}));
+    const m = new THREE.Mesh(wakeGeo, new THREE.MeshBasicMaterial({color:wakePuffColor,transparent:true,opacity:0.15,depthWrite:false}));
     m.rotation.x=-Math.PI/2;
     m.position.set(S.boat.x - Math.sin(S.boat.heading)*back + px*side*0.9, 0.35,
                    S.boat.z - Math.cos(S.boat.heading)*back + pz*side*0.9);
@@ -1842,10 +1899,11 @@ ribbonGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(RI
 ribbonGeo.setAttribute('alpha', new THREE.BufferAttribute(new Float32Array(RIBBON_MAX*2),1));
 { const idx=[]; for(let i=0;i<RIBBON_MAX-1;i++){ const a=i*2; idx.push(a,a+1,a+2, a+1,a+3,a+2); }
   ribbonGeo.setIndex(idx); }
+const ribbonUni={uCol:{value:new THREE.Color(0.88,0.93,0.95)}};
 const ribbon=new THREE.Mesh(ribbonGeo, new THREE.ShaderMaterial({
-  transparent:true, depthWrite:false,
+  transparent:true, depthWrite:false, uniforms:ribbonUni,
   vertexShader:`attribute float alpha; varying float vA; void main(){ vA=alpha; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }`,
-  fragmentShader:`varying float vA; void main(){ gl_FragColor=vec4(0.88,0.93,0.95,vA); }`}));
+  fragmentShader:`uniform vec3 uCol; varying float vA; void main(){ gl_FragColor=vec4(uCol,vA); }`}));
 ribbon.frustumCulled=false; scene.add(ribbon);
 function updateRibbon(dt){
   ribbonAcc+=dt;
@@ -2399,7 +2457,7 @@ function showDayCard(){
   const from=(windDir+Math.PI)%(Math.PI*2);
   const dirName=COMPASS[Math.round(from/(Math.PI/4))%8];
   const wx=S.weather==='rain'?'rain':S.weather==='overcast'?'overcast':'clear skies';
-  $('daycard').innerHTML=`Day ${S.day}<div style="font-size:15px;margin-top:6px;opacity:0.8;">${wx} · wind from the ${dirName}${marketIslName?` · market day at ${marketIslName}`:''}${festToday?' · 🏮 festival tonight':''}</div>`;
+  $('daycard').innerHTML=`Day ${S.day}<div style="font-size:15px;margin-top:6px;opacity:0.8;">${wx} · wind from the ${dirName}${marketIslName?` · market day at ${marketIslName}`:''}${festToday?' · 🏮 festival tonight':''}${harvestToday&&islands[2]?` · 🌾 harvest at ${islands[2].name}`:''}</div>`;
   $('daycard').style.opacity='1';
   dayCardT=4;
 }
@@ -2620,6 +2678,7 @@ function speciesActive(sp){
 function eligibleSpecies(zone){
   const out=[];
   for(const [id,sp] of Object.entries(SPECIES)){
+    if(zone.grotto && sp.biome!==zone.biome) continue;   // the quiet room keeps its own company
     if(sp.biome!=='any' && sp.biome!==zone.biome) continue;
     if(!speciesActive(sp)) continue;
     const w = sp.rar==='common'?10 : sp.rar==='uncommon'?4 : 1.4;
@@ -2692,6 +2751,7 @@ function updateShadows(dt){
         const bd=Math.hypot(S.boat.x-sh.x,S.boat.z-sh.z);
         o = bd<26 ? 0.45 : 0;
       }
+      if(z.grotto) o=0.5;   // the grotto glows for itself
       if(sh.species==='bottle'){
         sh.mesh.material.color.setHex(0x2a3c30);
         o = Math.max(o*0.9, vis>0? 0.25:0);
@@ -2715,8 +2775,8 @@ function nearestShadow(maxD){
   let best=null,bd=maxD;
   for(const z of zones) for(const sh of z.shadows){
     if(sh.state==='flee') continue;
-    if(shadowVisibility()<=0) continue;
-    if((S.hour>=20.5||S.hour<5) && S.upgrades.lamps){
+    if(shadowVisibility()<=0 && !z.grotto) continue;
+    if((S.hour>=20.5||S.hour<5) && S.upgrades.lamps && !z.grotto){
       if(Math.hypot(S.boat.x-sh.x,S.boat.z-sh.z)>26) continue;
     }
     const d=Math.hypot(S.boat.x-sh.x,S.boat.z-sh.z);
@@ -3011,7 +3071,7 @@ const QUESTS=[
   {text:'Buy an upgrade at the Hearthquay shipwright', done:()=>Object.values(S.upgrades).some(v=>v)},
   {text:'Log 5 species (C for codex) — time and weather change what bites', done:()=>Object.keys(S.codex).length>=5},
   {text:'Find the fathomless water beyond the islands', done:()=>S.omens.deepHint||S.upgrades.longline},
-  {text:'The codex holds 31 fish. The sea keeps her secrets — no hurry.', done:()=>Object.keys(S.codex).length>=31},
+  {text:'The codex holds every fish in these waters. The sea keeps her secrets — no hurry.', done:()=>Object.keys(S.codex).length>=Object.keys(SPECIES).length},
 ];
 function runQuests(){
   while(S.questIdx<QUESTS.length && QUESTS[S.questIdx].done()){
@@ -3527,12 +3587,13 @@ function renderDockTabs(isl){
 let folkView=null;
 function renderDockBody(isl){
   const body=$('dock-body'); body.innerHTML='';
-  const mk=(marketIslName && isl.name===marketIslName)?1.35:1;
+  const harvestHere=harvestToday && islands[2] && isl.name===islands[2].name;
+  const mk=(marketIslName && isl.name===marketIslName)?1.35:(harvestHere?1.25:1);
   if(dockTab==='market'){
     if(mk>1){
       const note=document.createElement('div'); note.className='empty-note';
       note.style.cssText='color:var(--gold);padding:4px 6px 10px;';
-      note.textContent='🎪 Market day — everything sells +35% here today.';
+      note.textContent=harvestHere&&mk===1.25?'🌾 Harvest day — the market pays +25% here today.':'🎪 Market day — everything sells +35% here today.';
       body.appendChild(note);
     }
     const fish=S.pieces.filter(p=>p.kind==='fish'||p.kind==='curio');
@@ -3612,6 +3673,7 @@ function renderDockBody(isl){
       wrap.style.cssText='display:flex;gap:14px;align-items:flex-start;';
       wrap.innerHTML=`<img src="${f.portrait}" style="width:96px;height:96px;border-radius:12px;border:1px solid var(--panel-line);flex-shrink:0;">
         <div><div class="name" style="font-size:16px;">${f.name} <span style="color:var(--dim);font-size:12px;">· ${FOLK_ROLES[f.role].title}</span></div>
+        ${st.favors?`<div style="font-size:11px;color:var(--teal);margin-top:2px;">remembers ${st.favors} favor${st.favors>1?'s':''} you've done</div>`:''}
         <div id="folk-line" style="font-family:Georgia,serif;font-style:italic;font-size:14px;line-height:1.6;color:#dce4f0;margin-top:8px;">“${folkLine(f)}”</div></div>`;
       body.appendChild(wrap);
       const btns=document.createElement('div'); btns.style.cssText='display:flex;gap:8px;margin-top:14px;flex-wrap:wrap;';
@@ -3633,11 +3695,40 @@ function renderDockBody(isl){
         db.addEventListener('click',()=>{
           let left=st.req.n;
           S.pieces=S.pieces.filter(p=>{ if(left>0&&p.kind==='fish'&&p.species===st.req.species){ left--; return false; } return true; });
-          S.money+=st.req.reward; st.warmth+=2; st.req=null; st.cd=S.day+2;
+          S.money+=st.req.reward; st.warmth+=2; st.favors=(st.favors||0)+1; st.req=null; st.cd=S.day+2;
           sfxCoin(); toast(`${f.name} beams. “Knew I liked your sail.”`);
           updateHUD(); renderDockBody(isl); updateTracker(); save();
         });
         btns.appendChild(db);
+      }
+      // friends give back, now and then
+      if(st.warmth>=4 && S.day>(st.lastGift||0)+2){
+        const gb=document.createElement('button'); gb.className='btn';
+        gb.style.cssText='border-color:rgba(232,182,76,0.6);';
+        gb.textContent='🎁 They have something for you';
+        gb.addEventListener('click',()=>{
+          st.lastGift=S.day;
+          const Rg=Math.random();
+          if(Rg<0.4){
+            const amt=15+st.warmth*3;
+            S.money+=amt; sfxCoin();
+            toast(`${f.name} presses $${amt} into your hand. “For the trouble you save me.”`);
+          } else if(Rg<0.75){
+            const commons=Object.keys(SPECIES).filter(id=>SPECIES[id].rar==='common');
+            const gid=commons[(Math.random()*commons.length)|0];
+            const piece={id:S.pieceSeq++, kind:'fish', species:gid, cells:SPECIES[gid].cells, rot:0, pos:null, caughtDay:S.day, caughtHour:S.hour};
+            const spot=findSpot(piece);
+            if(spot){ piece.pos=spot.pos; piece.rot=spot.rot; S.pieces.push(piece);
+              S.codex[gid]=(S.codex[gid]||0)+1;
+              toast(`${f.name} wraps up a ${SPECIES[gid].name} “for the road.”`);
+            } else { S.money+=12; sfxCoin(); toast(`${f.name} tried to gift you a fish — your hold is full, so coins it is.`); }
+          } else {
+            st.warmth++;
+            toast(`${f.name} tells you a story you'll be keeping. (You've grown closer.)`, true);
+          }
+          updateHUD(); renderDockBody(isl); save();
+        });
+        btns.appendChild(gb);
       }
       const back=document.createElement('button'); back.className='btn'; back.textContent='← Everyone';
       back.addEventListener('click',()=>{ folkView=null; renderDockBody(isl); });
@@ -3701,6 +3792,17 @@ function renderDockBody(isl){
       sw.appendChild(b);
     }
     row.appendChild(sw); body.appendChild(row);
+    const row2=document.createElement('div'); row2.className='row';
+    row2.innerHTML=`<div class="info"><div class="name">Wake</div><div class="meta">the trail you leave behind</div></div>`;
+    const sw2=document.createElement('div'); sw2.style.cssText='display:flex;gap:6px;';
+    for(const [wk,wc] of Object.entries(WAKE_COLORS)){
+      const b=document.createElement('button');
+      b.title=wk;
+      b.style.cssText=`width:26px;height:26px;border-radius:7px;cursor:pointer;background:${wc.label};border:2px solid ${S.paint.wake===wk?'var(--gold)':'rgba(242,233,216,0.25)'};`;
+      b.addEventListener('click',()=>buyCoat('wake',wk));
+      sw2.appendChild(b);
+    }
+    row2.appendChild(sw2); body.appendChild(row2);
   }
   else if(dockTab==='shipwright'){
     const UP=[
@@ -4108,6 +4210,10 @@ function updateTime(dt){
     festToastDone=true;
     toast('Festival night at Hearthquay — lanterns on the water after dark.', true);
   }
+  if(harvestToday && !harvToastDone && prev<9 && S.hour>=9 && islands[2]){
+    harvToastDone=true;
+    toast(`Harvest day at ${islands[2].name} — the mill's been busy, and the market pays for it.`, true);
+  }
 }
 
 // ---------- main loop ----------
@@ -4183,7 +4289,7 @@ function initFreshState(){
     pieceSeq:1,contractSeq:1,lastRegenDay:1,
     omens:{aurora:false, rainbow:false, dolphins:false, deepHint:false},
     hull:100, stats:{sold:0, delivered:0}, questIdx:0,
-    folk:{}, paint:{hull:'#24525a', cabin:'#bdae8f', trim:'#523b24', glass:'warm'}});
+    folk:{}, paint:{hull:'#24525a', cabin:'#bdae8f', trim:'#523b24', glass:'warm', wake:'classic'}});
 }
 function buildAll(){
   genWorld(); buildIslands(); buildBoat(); buildRain(); buildGulls();

@@ -34,6 +34,6 @@ python -m http.server 5777
 - Audio in `audio/` is CC0 from [OpenGameArt](https://opengameart.org) — see `audio/CREDITS.txt`.
 - Save lives in `localStorage`. Each new sea is a fresh seeded archipelago; weather,
   wind, and what's biting change daily. Some fish only bite in the rain, at night,
-  over sand — the codex is a puzzle box.
+  over sand — and one lives only in the grotto. The codex is a puzzle box.
 
 Built with Claude.

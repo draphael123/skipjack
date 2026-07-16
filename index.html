@@ -388,7 +388,7 @@ function loadSave(){
       lastRegenDay:d.lastRegenDay||d.day});
     S.boat.x=d.boat.x; S.boat.z=d.boat.z; S.boat.heading=d.boat.heading; S.boat.speed=0;
     S.settings=Object.assign({vol:0.8, music:true, post:true, sway:true, sharp:'balanced'}, d.settings||{});
-    S.omens=Object.assign({aurora:false, rainbow:false, dolphins:false, deepHint:false, springFound:false}, d.omens||{});
+    S.omens=Object.assign({aurora:false, rainbow:false, dolphins:false, deepHint:false, springFound:false, grottoFound:false}, d.omens||{});
     S.upgrades=Object.assign({engine:false,lamps:false,hold:false,icebox:false,lures:false,ledger:false,silent:false,longline:false,hold2:false}, d.upgrades||{});
     S.hull=(typeof d.hull==='number')?d.hull:100;
     S.stats=Object.assign({sold:0,delivered:0}, d.stats||{});
@@ -688,16 +688,17 @@ scene.add(water);
 
 // ---------- world generation ----------
 const islands=[]; const kelpPatches=[]; const reefPatches=[]; const deepZones=[]; const zones=[];
-let wreckSite=null, springSite=null, marketIslName=null;
+let wreckSite=null, springSite=null, grottoSite=null, marketIslName=null, festToday=false;
+const hardColliders=[];
 function genWorld(){
   const R = mulberry32(worldSeed);
   const names = [...ISLE_NAMES];
   // home island at origin-ish
   islands.push({name:'Hearthquay', x:0, z:0, r:26, home:true});
-  const n = 3;
+  const n = 4;
   for(let i=0;i<n;i++){
-    const ang = (i/n)*Math.PI*2 + 0.5 + (R()-0.5)*0.9;
-    const dist = 170 + R()*90;
+    const ang = (i/n)*Math.PI*2 + 0.5 + (R()-0.5)*0.7;
+    const dist = 175 + R()*105;
     const idx = Math.floor(R()*names.length);
     islands.push({name:names.splice(idx,1)[0], x:Math.cos(ang)*dist, z:Math.sin(ang)*dist, r:16+R()*10, home:false});
   }
@@ -737,6 +738,12 @@ function genWorld(){
     const a=R()*Math.PI*2, d=75+R()*160, x=Math.cos(a)*d, z=Math.sin(a)*d;
     if(clearOf(x,z,32) && (!wreckSite||Math.hypot(x-wreckSite.x,z-wreckSite.z)>60)) springSite={x,z};
   }
+  for(let t=0;t<30 && !grottoSite;t++){
+    const a=R()*Math.PI*2, d=95+R()*160, x=Math.cos(a)*d, z=Math.sin(a)*d;
+    const farFrom=(s)=>!s||Math.hypot(x-s.x,z-s.z)>60;
+    if(clearOf(x,z,36) && farFrom(wreckSite) && farFrom(springSite)) grottoSite={x, z, ang:R()*Math.PI*2};
+  }
+  if(grottoSite) zones.push({x:grottoSite.x, z:grottoSite.z, inner:0, outer:7, biome:'sand', wreck:true, shadows:[]});
   // fishing zones
   for(const isl of islands) zones.push({x:isl.x, z:isl.z, inner:isl.r+8, outer:isl.r+34, biome:'sand', shadows:[]});
   if(wreckSite) zones.push({x:wreckSite.x, z:wreckSite.z, inner:0, outer:15, biome:'sand', wreck:true, shadows:[]});
@@ -780,6 +787,8 @@ const beamPivots=[];
 let lightHouseLamp=null;
 const windowMats=[], dockLights=[], landMats=[], buoyMats=[], buoys=[], outcrops=[], kelpFronds=[], kelpPads=[];
 const flags=[], chimneys=[], villagers=[], windowPoolMats=[], beachGulls=[], kelpFish=[], spinners=[];
+const festMats=[], festLanterns=[];
+let festGroup=null, festToastDone=false;
 let windDir=0, auroraTonight=false, duskTintR=1, duskTintB=1;
 function refreshDaily(){
   const Rd=mulberry32(worldSeed+S.day*577);
@@ -790,6 +799,9 @@ function refreshDaily(){
   duskTintR = 1+Math.max(0,shift)*0.5;
   duskTintB = 1+Math.max(0,-shift)*2.2;
   marketIslName = (S.day%3===2 && islands.length) ? islands[(Rd()*islands.length)|0].name : null;
+  festToday = S.day%7===6;
+  festToastDone=false;
+  if(festGroup) festGroup.visible=festToday;
 }
 // push dome vertices around radially so islands stop being perfect spheres
 function bumpy(geo, amp, seed){
@@ -855,6 +867,7 @@ const ISLAND_THEMES=[
   {wall:0x9aa8b0, roof:0x46525e, stoneChance:0.3, landmark:'nets'},     // weathered fishing hamlet
   {wall:0xd8c096, roof:0x9a7a3a, stoneChance:0.15,landmark:'windmill'}, // golden thatch farm isle
   {wall:0x9a938a, roof:0x5a6a44, stoneChance:0.8, landmark:'cairn'},    // stone-and-moss quarry folk
+  {wall:0xd8d4c8, roof:0x4a4a7a, stoneChance:0.5, landmark:'shrine'},   // the quiet shrine isle
 ];
 function buildIslands(){
   const R = mulberry32(worldSeed+7);
@@ -1065,6 +1078,31 @@ function buildIslands(){
         mill.add(hub);
         spinners.push({m:hub, spd:0.55});
         mill.position.set(lmX,lmY,lmZ); mill.rotation.y=-lmAng+Math.PI/2; setCast(mill); scene.add(mill);
+      } else if(theme.landmark==='shrine'){
+        const shrine=new THREE.Group();
+        const postM=new THREE.MeshStandardMaterial({color:0x8a3030,roughness:0.9});
+        for(const px of [-1.1,1.1]){
+          const post=new THREE.Mesh(new THREE.CylinderGeometry(0.13,0.15,2.6,7), postM);
+          post.position.set(px,1.3,0); shrine.add(post);
+        }
+        const beam=new THREE.Mesh(new THREE.BoxGeometry(3.2,0.22,0.3), postM);
+        beam.position.y=2.6; beam.rotation.z=0; shrine.add(beam);
+        const beam2=new THREE.Mesh(new THREE.BoxGeometry(2.6,0.16,0.24), postM);
+        beam2.position.y=2.15; shrine.add(beam2);
+        const bell=new THREE.Mesh(new THREE.CylinderGeometry(0.16,0.24,0.32,8),
+          new THREE.MeshStandardMaterial({color:0xb8a44a,roughness:0.5,metalness:0.5}));
+        bell.position.y=1.9; shrine.add(bell);
+        for(const lx of [-2.2,2.2]){
+          const slant=new THREE.Mesh(new THREE.BoxGeometry(0.5,0.9,0.5),
+            new THREE.MeshStandardMaterial({color:0x9a9488,roughness:1}));
+          slant.position.set(lx,0.45,0.3); shrine.add(slant);
+          const glowM=new THREE.MeshStandardMaterial({color:0xffe2a0,emissive:0xffc860,emissiveIntensity:0.1});
+          buoyMats.push(glowM);
+          const glow=new THREE.Mesh(new THREE.BoxGeometry(0.3,0.3,0.3), glowM);
+          glow.position.set(lx,1.05,0.3); shrine.add(glow);
+        }
+        shrine.position.set(lmX,lmY,lmZ); shrine.rotation.y=-lmAng+Math.PI/2;
+        setCast(shrine); scene.add(shrine);
       } else if(theme.landmark==='cairn'){
         const cairn=new THREE.Group();
         const cM=new THREE.MeshStandardMaterial({color:0x8a8278,roughness:1,emissive:new THREE.Color().setRGB(0.04,0.038,0.034)});
@@ -1154,6 +1192,53 @@ function buildIslands(){
       setCast(lh);
       scene.add(lh);
       addFlag(new THREE.Vector3(lh.position.x, lh.position.y+15.55, lh.position.z), 1.3);
+      // festival rigging — strings of colored lanterns, raised every seventh day
+      festGroup=new THREE.Group();
+      const festCols=[0xff6a5a,0xffc84a,0x5ad8c8,0xc86ad8];
+      for(let s=0;s<3;s++){
+        const aA=dockAng+0.20+s*0.34, aB=aA+0.30;
+        const rA=isl.r*0.55, rB=isl.r*0.50;
+        const pA=new THREE.Vector3(isl.x+Math.cos(aA)*rA, groundY(isl,rA)+3.2, isl.z+Math.sin(aA)*rA);
+        const pB=new THREE.Vector3(isl.x+Math.cos(aB)*rB, groundY(isl,rB)+3.2, isl.z+Math.sin(aB)*rB);
+        const pts=[];
+        for(let i=0;i<=7;i++){
+          const u=i/7;
+          const p=pA.clone().lerp(pB,u); p.y-=Math.sin(Math.PI*u)*0.9;
+          pts.push(p);
+          if(i>0&&i<7){
+            const lm=new THREE.MeshStandardMaterial({color:festCols[i%4], emissive:festCols[i%4], emissiveIntensity:0.3});
+            festMats.push(lm);
+            const lant=new THREE.Mesh(new THREE.SphereGeometry(0.16,8,6), lm);
+            lant.position.copy(p); lant.position.y-=0.18;
+            festGroup.add(lant);
+          }
+        }
+        const line=new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts),
+          new THREE.LineBasicMaterial({color:0x2a2018,transparent:true,opacity:0.7}));
+        festGroup.add(line);
+      }
+      festGroup.visible=false;
+      scene.add(festGroup);
+      // floating festival lanterns, released after dusk
+      const floatTex=radialTex([[0,'rgba(255,200,110,0.9)'],[0.5,'rgba(255,180,90,0.35)'],[1,'rgba(255,170,80,0)']]);
+      for(let i=0;i<8;i++){
+        const g2=new THREE.Group();
+        const base=new THREE.Mesh(new THREE.BoxGeometry(0.4,0.12,0.4),
+          new THREE.MeshStandardMaterial({color:0x8a6a44,roughness:1}));
+        g2.add(base);
+        const fm=new THREE.MeshStandardMaterial({color:0xffd28a, emissive:0xffb860, emissiveIntensity:0.4});
+        festMats.push(fm);
+        const paper=new THREE.Mesh(new THREE.CylinderGeometry(0.13,0.16,0.3,7), fm);
+        paper.position.y=0.2; g2.add(paper);
+        const halo=new THREE.Sprite(new THREE.SpriteMaterial({map:floatTex,transparent:true,opacity:0.5,
+          depthWrite:false,blending:THREE.AdditiveBlending}));
+        halo.scale.setScalar(1.6); halo.position.y=0.25; g2.add(halo);
+        g2.visible=false;
+        const fa=Math.random()*Math.PI*2;
+        g2.position.set(isl.x+Math.cos(fa)*(isl.r+14+Math.random()*12), 0.4, isl.z+Math.sin(fa)*(isl.r+14+Math.random()*12));
+        scene.add(g2);
+        festLanterns.push({g:g2, home:isl, ph:Math.random()*6});
+      }
     }
     g.position.set(isl.x,0,isl.z);
     scene.add(g);
@@ -1217,6 +1302,40 @@ function buildIslands(){
     h2.position.set(wreckSite.x+4.4, -0.35, wreckSite.z+2.2); h2.rotation.set(-0.3,1.4,-0.35); scene.add(h2);
     const mast=new THREE.Mesh(new THREE.CylinderGeometry(0.1,0.14,7,6), wm);
     mast.position.set(wreckSite.x+1, 1.2, wreckSite.z+0.6); mast.rotation.z=1.05; mast.rotation.x=0.3; scene.add(mast);
+  }
+  // the grotto — a hollow in the rocks you can sail right into
+  if(grottoSite){
+    const gm=new THREE.MeshStandardMaterial({color:0x4a4640,roughness:1,emissive:new THREE.Color().setRGB(0.025,0.024,0.022)});
+    landMats.push(gm);
+    const gAng=grottoSite.ang;
+    // horseshoe of tall rocks, mouth open toward gAng
+    for(let i=0;i<7;i++){
+      const a=gAng+Math.PI*0.55 + (i/6)*Math.PI*0.9;
+      const rx=grottoSite.x+Math.cos(a)*8, rz=grottoSite.z+Math.sin(a)*8;
+      const rock=new THREE.Mesh(new THREE.IcosahedronGeometry(3.2+((i*7)%3),0), gm);
+      rock.position.set(rx, 1.6+((i*5)%2), rz);
+      rock.rotation.set(i*1.3,i*0.7,i*0.9); rock.scale.y=1.5;
+      setCast(rock); scene.add(rock);
+      hardColliders.push({x:rx, z:rz, r:3.4});
+    }
+    // an entrance arch spanning the mouth — the bowl itself stays open to the sky
+    const lintel=new THREE.Mesh(new THREE.BoxGeometry(11,1.6,3), gm);
+    lintel.position.set(grottoSite.x+Math.cos(gAng)*7.5, 7.0, grottoSite.z+Math.sin(gAng)*7.5);
+    lintel.rotation.y=-gAng+Math.PI/2; lintel.rotation.z=0.05;
+    setCast(lintel); scene.add(lintel);
+    // something glimmers inside
+    const glowTex=radialTex([[0,'rgba(120,232,216,0.7)'],[0.5,'rgba(110,220,210,0.3)'],[1,'rgba(100,210,200,0)']]);
+    for(let i=0;i<5;i++){
+      const s=new THREE.Sprite(new THREE.SpriteMaterial({map:glowTex,transparent:true,opacity:0.6,
+        depthWrite:false,blending:THREE.AdditiveBlending}));
+      const a=gAng+Math.PI*0.6+(i/4)*Math.PI*0.8;
+      s.position.set(grottoSite.x+Math.cos(a)*5.6, 1.2+(i%3)*1.1, grottoSite.z+Math.sin(a)*5.6);
+      s.scale.setScalar(2.4+(i%2));
+      scene.add(s);
+    }
+    const gLight=new THREE.PointLight(0x6ae0d0, 1.7, 28, 1.8);
+    gLight.position.set(grottoSite.x, 2.5, grottoSite.z);
+    scene.add(gLight);
   }
   // the warm spring — kind water in a ring of stones
   if(springSite){
@@ -1945,7 +2064,9 @@ function placeVillagers(){
 }
 function updateVillagers(dt){
   const t=waterUni.uTime.value;
+  const late=(S.hour>=21||S.hour<5);
   for(const v of villagers){
+    if(v.type!=='cat') v.g.visible=!late;   // folk head indoors; the cat keeps her own hours
     v.g.rotation.z=Math.sin(t*1.1+v.ph)*0.025;
     if(v.type==='stand'){
       const d=Math.hypot(S.boat.x-v.g.position.x, S.boat.z-v.g.position.z);
@@ -2278,7 +2399,7 @@ function showDayCard(){
   const from=(windDir+Math.PI)%(Math.PI*2);
   const dirName=COMPASS[Math.round(from/(Math.PI/4))%8];
   const wx=S.weather==='rain'?'rain':S.weather==='overcast'?'overcast':'clear skies';
-  $('daycard').innerHTML=`Day ${S.day}<div style="font-size:15px;margin-top:6px;opacity:0.8;">${wx} · wind from the ${dirName}${marketIslName?` · market day at ${marketIslName}`:''}</div>`;
+  $('daycard').innerHTML=`Day ${S.day}<div style="font-size:15px;margin-top:6px;opacity:0.8;">${wx} · wind from the ${dirName}${marketIslName?` · market day at ${marketIslName}`:''}${festToday?' · 🏮 festival tonight':''}</div>`;
   $('daycard').style.opacity='1';
   dayCardT=4;
 }
@@ -2313,6 +2434,27 @@ function updateLife(dt){
   updateGlints(dt);
   for(const sp of spinners) sp.m.rotation.z += sp.spd*dt;
   updateBeachGulls(dt);
+  // festival lanterns ride the evening tide
+  for(const fl of festLanterns){
+    const on = festToday && lampFactor>0.3;
+    fl.g.visible=on;
+    if(!on) continue;
+    fl.g.position.x += Math.cos(windDir)*0.4*dt;
+    fl.g.position.z += Math.sin(windDir)*0.4*dt;
+    fl.g.position.y = waveH(fl.g.position.x, fl.g.position.z, waterUni.uTime.value)+0.16;
+    fl.g.rotation.y += dt*0.2;
+    if(Math.hypot(fl.g.position.x-fl.home.x, fl.g.position.z-fl.home.z) > fl.home.r+60){
+      const fa=Math.random()*Math.PI*2;
+      fl.g.position.set(fl.home.x+Math.cos(fa)*(fl.home.r+12), 0.4, fl.home.z+Math.sin(fa)*(fl.home.r+12));
+    }
+  }
+  // the grotto keeps its own light
+  if(grottoSite && !S.omens.grottoFound && Math.hypot(S.boat.x-grottoSite.x, S.boat.z-grottoSite.z)<6.5){
+    S.omens.grottoFound=true;
+    toast('The grotto swallows the sound of the sea. Something in the rock glimmers back at your lantern.', true);
+    cinema(7);
+    save();
+  }
   // the warm spring mends old timbers
   if(springSite){
     updateLife.sprAcc=(updateLife.sprAcc||0)+dt;
@@ -2732,6 +2874,7 @@ function applyTimeOfDay(){
   for(const dl of dockLights){ dl.light.intensity = lampOn?1.3:0; dl.globe.material.emissiveIntensity = lampOn?1.6:0.1; }
   // buoy lights wake with the dark
   for(const m of buoyMats) m.emissiveIntensity = lampOn?1.5:0.15;
+  for(const m of festMats) m.emissiveIntensity = lampOn?1.5:0.35;
   lastDayness = dayness;
   // shallow tint follows the day's water
   waterUni.uDayness.value = dayness;
@@ -3250,8 +3393,24 @@ const FOLK_ROLES={
   gran:{title:'Nan of the isle', hat:'kerchief',
     lines:["I've seen the sky go green twice in my life. Once was last spring.","Sit a moment. The fish will wait — they always have.","My husband fished the Deeps. The Deeps were fond of him, mostly."],
     rain:"The rain's an old friend. Loud, but kind.", night:"Stars are thickest just before you give up looking."},
+  hermit:{title:'Hermit of the shrine', hat:'none',
+    lines:["The bell rings itself some nights. I've stopped asking how.","Quiet is a kind of wealth. This island is rich.","You may ring the bell once, if you must. Make it count."],
+    rain:"The rain and I have an understanding.", night:"Stars are better company than most."},
+  gardener:{title:'Shrine gardener', hat:'straw',
+    lines:["Moss takes decades. That's why I like it.","The hermit says three words a day. I ration mine too.","Leave a fish at the shrine if you like. The cat handles the rest."],
+    rain:"The moss drinks well today.", night:"The lanterns stay lit for whoever needs them."},
 };
-const ISLAND_FOLK=[['harbormaster','keeper','kid'],['netmender','fisher','painter'],['miller','baker'],['mason','gran']];
+const ISLAND_FOLK=[['harbormaster','keeper','kid'],['netmender','fisher','painter'],['miller','baker'],['mason','gran'],['hermit','gardener']];
+// who's awake when — [sleepStart, sleepEnd); null never sleeps
+const FOLK_SLEEP={harbormaster:[23,5], keeper:[9,15], kid:[20,7], netmender:[22,5], fisher:[13,17],
+  painter:[21,6], miller:[22,5], baker:[20,2], mason:[22,5], gran:[21,5], hermit:null, gardener:[22,5]};
+function folkAwake(f){
+  const w=FOLK_SLEEP[f.role];
+  if(!w) return true;
+  const [a,b]=w, h=S.hour;
+  const asleep = a<=b ? (h>=a&&h<b) : (h>=a||h<b);
+  return !asleep;
+}
 const FOLK_NAMES=['Rooke','Isla','Pip','Marta','Old Bren','Sorrel','Cormac','June','Wick','Nan Aggie','Petra','Tam'];
 const folkList=[];
 function makePortrait(seed, role){
@@ -3490,13 +3649,18 @@ function renderDockBody(isl){
     for(const f of here){
       maybeFolkRequest(f);
       const st=S.folk[f.key];
+      const awake=folkAwake(f);
       const row=document.createElement('div'); row.className='row';
-      row.innerHTML=`<img src="${f.portrait}" style="width:44px;height:44px;border-radius:9px;border:1px solid var(--panel-line);">
-        <div class="info"><div class="name">${f.name} <span style="color:var(--dim);font-weight:400;font-size:11px;">${FOLK_ROLES[f.role].title}</span>${st.req&&!st.req.accepted?' <span style="color:var(--teal);font-size:11px;">· has a favor to ask</span>':''}</div>
-        <div class="meta">${folkGreeting(f)}</div></div>`;
-      const b=document.createElement('button'); b.className='btn'; b.textContent='Talk';
-      b.addEventListener('click',()=>{ folkView=f.key; renderDockBody(isl); });
-      row.appendChild(b); body.appendChild(row);
+      if(!awake) row.style.opacity='0.45';
+      row.innerHTML=`<img src="${f.portrait}" style="width:44px;height:44px;border-radius:9px;border:1px solid var(--panel-line);${awake?'':'filter:grayscale(0.7);'}">
+        <div class="info"><div class="name">${f.name} <span style="color:var(--dim);font-weight:400;font-size:11px;">${FOLK_ROLES[f.role].title}</span>${awake&&st.req&&!st.req.accepted?' <span style="color:var(--teal);font-size:11px;">· has a favor to ask</span>':''}</div>
+        <div class="meta">${awake?folkGreeting(f):'asleep — lamps out, come back later'}</div></div>`;
+      if(awake){
+        const b=document.createElement('button'); b.className='btn'; b.textContent='Talk';
+        b.addEventListener('click',()=>{ folkView=f.key; renderDockBody(isl); });
+        row.appendChild(b);
+      }
+      body.appendChild(row);
     }
   }
   else if(dockTab==='paint'){
@@ -3829,7 +3993,7 @@ function updateBoat(dt){
     }
   }
   // outcrop collision — rocks are not
-  for(const o of outcrops){
+  for(const o of outcrops.concat(hardColliders)){
     const dx=S.boat.x-o.x, dz=S.boat.z-o.z;
     const d=Math.hypot(dx,dz);
     if(d<o.r){
@@ -3940,6 +4104,10 @@ function updateTime(dt){
   if(prev<20 && S.hour>=20 && S.accepted.some(c=>c.day===S.day)) toast('Dusk settles — delivery bonuses have sailed.');
   // the afternoon front, if tomorrow's weather wants in early
   if(prev<13 && S.hour>=13 && !front && S.weather!=='rain' && S.weatherNext==='rain') startFront();
+  if(festToday && !festToastDone && prev<17.5 && S.hour>=17.5){
+    festToastDone=true;
+    toast('Festival night at Hearthquay — lanterns on the water after dark.', true);
+  }
 }
 
 // ---------- main loop ----------
@@ -4094,6 +4262,8 @@ window.__dbg={
   card(){ showDayCard(); },
   cine(){ cinema(6); },
   wind(){ return windDir; },
+  day(n){ S.day=n; refreshDaily(); updateHUD(); },
+  sites(){ return {wreck:wreckSite, spring:springSite, grotto:grottoSite, fest:festToday, market:marketIslName, colliders:hardColliders.length}; },
   audio(){ return {ctx:AC?AC.state:'none', loaded:Object.keys(buffers), music:musicGain?+musicGain.gain.value.toFixed(3):null, lap:lapGain?+lapGain.gain.value.toFixed(3):null, rain:rainGain?+rainGain.gain.value.toFixed(3):null}; },
   sky(){ return {auroraTonight, planes:auroraGroup?auroraGroup.children.map(p=>({o:+p.material.opacity.toFixed(3), pos:p.getWorldPosition(new THREE.Vector3()).toArray().map(v=>v|0)})):null, cam:camera.position.toArray().map(v=>v|0)}; },
   money(n){ S.money=n; updateHUD(); },

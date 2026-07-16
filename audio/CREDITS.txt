@@ -1,0 +1,6 @@
+All audio in this folder is CC0 (public domain) from opengameart.org:
+- music-seaside.flac  = "Seaside Village" by KarateStudios  (opengameart.org/content/seaside-village)
+- wave1-4.flac        = "Beach Ocean Waves" by jasinski     (opengameart.org/content/beach-ocean-waves)
+- gull1-3.wav         = "Solo Seagull Sound Effects" by Rango Mango (opengameart.org/content/solo-seagull-sound-effects)
+- splash1-3.ogg, rain-loop.ogg, lap-loop.ogg = "40 CC0 water / splash / slime SFX" by rubberduck (opengameart.org/content/40-cc0-water-splash-slime-sfx)
+No attribution required; credited out of courtesy.

@@ -10,3 +10,6 @@ Additional CC0 music from opengameart.org:
 - music-grotto.mp3   = 'Mysterious Ambience' by cynicmusic / pixelsphere.org (opengameart.org/content/mysterious-ambience-song21)
 - music-festival.mp3 = 'Medieval: Minstrel Dance' by RandomMind (opengameart.org/content/medieval-minstrel-dance)
 - music-harvest.mp3  = 'Medieval: Harvest Season' by RandomMind (opengameart.org/content/medieval-harvest-season)
+- music-docked.mp3   = 'Medieval: Market Day (loop)' by RandomMind (opengameart.org/content/medieval-market-day)
+- music-day2.mp3     = 'Medieval: Exploration' by RandomMind (opengameart.org/content/medieval-exploration)
+- music-rain.mp3     = 'Rain Drops' by SpringySpringo (opengameart.org/content/rain-drops)

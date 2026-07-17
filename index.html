@@ -211,6 +211,10 @@
   <h2>Ship's Journal</h2><div class="sub">how this sea works</div>
   <div id="journal-quests" style="margin-bottom:14px;"></div>
   <div style="font-size:13px;line-height:1.75;color:var(--cream);">
+    <div style="color:var(--gold);font-style:italic;margin-bottom:2px;">Why sail?</div>
+    Money buys upgrades, upgrades open water, water holds fish, and fish make friends of
+    strangers. But the long game is above: befriend the islands, fill the codex, witness
+    the wonders — and see what the sea does about it.<br><br>
     <div style="color:var(--gold);font-style:italic;margin-bottom:2px;">Fishing</div>
     Fish swim as <b>dark shadows</b> in the fishing grounds — the bright turquoise shallows around
     islands, the green kelp beds, the coral reefs, and (with a Longline) the dark Deeps.
@@ -364,6 +368,7 @@ const S = {
   omens:{aurora:false, rainbow:false, dolphins:false, deepHint:false},
   hull:100, stats:{sold:0, delivered:0}, questIdx:0,
   folk:{}, paint:{hull:'#24525a', cabin:'#bdae8f', trim:'#523b24', glass:'warm', wake:'classic'},
+  finaleSeen:false,
 };
 let titleMode=true, paused=false;
 
@@ -376,7 +381,7 @@ function save(){
     codex:S.codex, curios:S.curios, notesRead:S.notesRead, leviathanSeen:S.leviathanSeen,
     boat:{x:S.boat.x,z:S.boat.z,heading:S.boat.heading}, pieceSeq:S.pieceSeq, contractSeq:S.contractSeq, lastRegenDay:S.lastRegenDay,
     settings:S.settings, omens:S.omens, hull:S.hull, stats:S.stats, questIdx:S.questIdx,
-    folk:S.folk, paint:S.paint,
+    folk:S.folk, paint:S.paint, finaleSeen:S.finaleSeen,
   })); }catch(e){}
 }
 function loadSave(){
@@ -395,6 +400,7 @@ function loadSave(){
     S.stats=Object.assign({sold:0,delivered:0}, d.stats||{});
     S.questIdx=d.questIdx||0;
     S.folk=d.folk||{};
+    S.finaleSeen=!!d.finaleSeen;
     S.paint=Object.assign({hull:'#24525a', cabin:'#bdae8f', trim:'#523b24', glass:'warm', wake:'classic'}, d.paint||{});
     return true;
   }catch(e){ return false; }
@@ -1815,6 +1821,168 @@ function updateWaterFX(dt){
   }
 }
 
+// ---------- ocean life: the sea has residents ----------
+const turtles=[], jellies=[], schools=[], herons=[], rowboats=[];
+function buildOceanLife(){
+  const R=mulberry32(worldSeed+808);
+  // sea turtles — unhurried, shy of wakes, gone by night
+  const shellM=new THREE.MeshStandardMaterial({color:0x3a6a4a,roughness:0.9});
+  const skinM=new THREE.MeshStandardMaterial({color:0x6a8a5a,roughness:1});
+  for(let i=0;i<2;i++){
+    const g=new THREE.Group();
+    const shell=new THREE.Mesh(new THREE.SphereGeometry(0.55,10,8), shellM);
+    shell.scale.set(1,0.45,1.25); g.add(shell);
+    const head=new THREE.Mesh(new THREE.SphereGeometry(0.18,8,6), skinM);
+    head.position.set(0,0.05,0.75); g.add(head);
+    for(const [fx,fz] of [[-0.55,0.35],[0.55,0.35],[-0.5,-0.5],[0.5,-0.5]]){
+      const fin=new THREE.Mesh(new THREE.SphereGeometry(0.2,6,4), skinM);
+      fin.scale.set(1.4,0.3,0.7); fin.position.set(fx,0,fz); g.add(fin);
+    }
+    scene.add(g);
+    const a=R()*Math.PI*2, d=90+R()*140;
+    turtles.push({g, x:Math.cos(a)*d, z:Math.sin(a)*d, dir:R()*6.28, spd:0.5+R()*0.3, sub:0});
+  }
+  // jellyfish — soft violet lights of the kelp and reef, night only
+  const jellyTex=radialTex([[0,'rgba(180,140,255,0.8)'],[0.5,'rgba(160,120,250,0.3)'],[1,'rgba(150,110,240,0)']]);
+  const patches=kelpPatches.concat(reefPatches);
+  for(let i=0;i<8 && patches.length;i++){
+    const p=patches[i%patches.length];
+    const g=new THREE.Group();
+    const bellM=new THREE.MeshStandardMaterial({color:0xb08ae0, transparent:true, opacity:0.55, roughness:0.4,
+      emissive:0x8a5ad0, emissiveIntensity:0.25});
+    const bell=new THREE.Mesh(new THREE.SphereGeometry(0.28,8,6,0,Math.PI*2,0,Math.PI/2), bellM);
+    g.add(bell);
+    const halo=new THREE.Sprite(new THREE.SpriteMaterial({map:jellyTex, transparent:true, opacity:0.4, depthWrite:false, blending:THREE.AdditiveBlending}));
+    halo.scale.setScalar(1.4); g.add(halo);
+    g.visible=false;
+    scene.add(g);
+    const a=R()*Math.PI*2, rr=R()*(p.r*0.8);
+    jellies.push({g, x:p.x+Math.cos(a)*rr, z:p.z+Math.sin(a)*rr, ph:R()*6.28, bellM});
+  }
+  // bait schools — quick silver shimmers, not for catching
+  for(let i=0;i<4;i++){
+    const zn=zones[(R()*zones.length)|0];
+    const grp=new THREE.Group();
+    const darts=[];
+    for(let d2=0;d2<12;d2++){
+      const dart=new THREE.Mesh(new THREE.PlaneGeometry(0.32,0.07),
+        new THREE.MeshBasicMaterial({color:0xcfe0ea, transparent:true, opacity:0.5, depthWrite:false}));
+      dart.rotation.x=-Math.PI/2;
+      grp.add(dart);
+      darts.push({m:dart, r:0.6+R()*2.4, ph:R()*6.28, spd:2.2+R()});
+    }
+    scene.add(grp);
+    schools.push({grp, x:zn.x+(R()-0.5)*zn.outer, z:zn.z+(R()-0.5)*zn.outer, darts, drift:R()*6.28});
+  }
+  // herons — patient sentries on the rocks and the wreck
+  const heronSpots=[];
+  for(const o of outcrops.slice(0,2)) heronSpots.push({x:o.x, z:o.z, y:1.7});
+  if(wreckSite) heronSpots.push({x:wreckSite.x+1, z:wreckSite.z+1.2, y:1.5});
+  const hM=new THREE.MeshStandardMaterial({color:0x8a94a0,roughness:1});
+  const hM2=new THREE.MeshStandardMaterial({color:0x3a3f48,roughness:1});
+  for(let i=0;i<Math.min(2,heronSpots.length);i++){
+    const sp=heronSpots[i];
+    const g=new THREE.Group();
+    for(const lx of [-0.06,0.06]){
+      const leg=new THREE.Mesh(new THREE.CylinderGeometry(0.02,0.02,0.55,4), hM2);
+      leg.position.set(lx,0.28,0); g.add(leg);
+    }
+    const body=new THREE.Mesh(new THREE.SphereGeometry(0.22,8,6), hM);
+    body.scale.set(0.8,0.75,1.25); body.position.y=0.65; g.add(body);
+    const neck=new THREE.Mesh(new THREE.CylinderGeometry(0.045,0.06,0.5,5), hM);
+    neck.position.set(0,0.98,0.18); neck.rotation.x=-0.35; g.add(neck);
+    const head=new THREE.Mesh(new THREE.SphereGeometry(0.09,7,5), hM);
+    head.position.set(0,1.22,0.30); g.add(head);
+    const beak=new THREE.Mesh(new THREE.ConeGeometry(0.035,0.3,5),
+      new THREE.MeshStandardMaterial({color:0xd8a84a,roughness:0.8}));
+    beak.rotation.x=Math.PI/2; beak.position.set(0,1.21,0.48); g.add(beak);
+    g.position.set(sp.x, sp.y, sp.z);
+    g.rotation.y=R()*6.28;
+    setCast(g); scene.add(g);
+    herons.push({g, ph:R()*6.28});
+  }
+  // beach dressing — driftwood and starfish along the wet sand
+  for(const isl of islands){
+    const R2=mulberry32((isl.x*17+isl.z*3)|0);
+    for(let i=0;i<3;i++){
+      const a=R2()*Math.PI*2, rr=isl.r*(0.80+R2()*0.12);
+      const drift=new THREE.Mesh(new THREE.CylinderGeometry(0.12+R2()*0.08,0.16+R2()*0.08,2+R2()*1.6,6),
+        new THREE.MeshStandardMaterial({color:0x9a8468,roughness:1}));
+      drift.position.set(isl.x+Math.cos(a)*rr, groundY(isl,rr)+0.10, isl.z+Math.sin(a)*rr);
+      drift.rotation.set(Math.PI/2+(R2()-0.5)*0.2, 0, R2()*6.28);
+      drift.castShadow=true;
+      scene.add(drift);
+    }
+    for(let i=0;i<4;i++){
+      const a=R2()*Math.PI*2, rr=isl.r*(0.76+R2()*0.16);
+      const star=new THREE.Group();
+      const sM=new THREE.MeshStandardMaterial({color:R2()<0.5?0xd87a4a:0xc85a6a,roughness:1});
+      for(let arm=0;arm<5;arm++){
+        const aa=arm/5*Math.PI*2;
+        const seg=new THREE.Mesh(new THREE.SphereGeometry(0.09,5,4), sM);
+        seg.scale.set(1.6,0.35,0.6);
+        seg.position.set(Math.cos(aa)*0.12,0,Math.sin(aa)*0.12);
+        seg.rotation.y=-aa;
+        star.add(seg);
+      }
+      star.position.set(isl.x+Math.cos(a)*rr, groundY(isl,rr)+0.06, isl.z+Math.sin(a)*rr);
+      star.rotation.y=R2()*6.28;
+      scene.add(star);
+    }
+    // and a rowboat moored off every dock
+    const ang=Math.atan2(isl.dockZ-isl.z, isl.dockX-isl.x);
+    const px=Math.cos(ang),pz=Math.sin(ang),qx=-pz,qz=px;
+    const g=new THREE.Group();
+    const rowM=new THREE.MeshStandardMaterial({color:0x7a5a3a,roughness:1,side:THREE.DoubleSide});
+    const hull=new THREE.Mesh(new THREE.LatheGeometry([new THREE.Vector2(0.01,-0.2),new THREE.Vector2(0.4,-0.16),new THREE.Vector2(0.5,0.12)],10), rowM);
+    hull.scale.set(1,1,2.1); g.add(hull);
+    const bench=new THREE.Mesh(new THREE.BoxGeometry(0.7,0.06,0.18), rowM);
+    bench.position.y=0.02; g.add(bench);
+    g.position.set(isl.x+px*(isl.r*0.74+5)+qx*-3.0, 0.1, isl.z+pz*(isl.r*0.74+5)+qz*-3.0);
+    g.rotation.y=R()*6.28;
+    scene.add(g);
+    rowboats.push({g, ph:R()*6});
+  }
+}
+function updateOceanLife(dt){
+  const t=waterUni.uTime.value;
+  const night=(S.hour>=20.5||S.hour<5);
+  for(const tu of turtles){
+    tu.dir+=(Math.random()-0.5)*dt*0.4;
+    tu.x+=Math.cos(tu.dir)*tu.spd*dt; tu.z+=Math.sin(tu.dir)*tu.spd*dt;
+    const bd=Math.hypot(S.boat.x-tu.x,S.boat.z-tu.z);
+    const wantSub=(night||bd<7)?1:0;
+    tu.sub += (wantSub-tu.sub)*Math.min(1,dt*0.8);
+    tu.g.position.set(tu.x, waveH(tu.x,tu.z,t)+0.05-tu.sub*1.4, tu.z);
+    tu.g.rotation.y=-tu.dir+Math.PI/2;
+    tu.g.visible=tu.sub<0.95;
+    if(Math.hypot(tu.x,tu.z)>520) tu.dir=Math.atan2(-tu.z,-tu.x);
+  }
+  for(const j of jellies){
+    j.g.visible=night;
+    if(!night) continue;
+    j.g.position.set(j.x+Math.sin(t*0.3+j.ph)*1.5, waveH(j.x,j.z,t)+0.05+Math.sin(t*1.1+j.ph)*0.15, j.z+Math.cos(t*0.25+j.ph)*1.5);
+    j.g.scale.setScalar(0.9+0.15*Math.sin(t*2+j.ph));
+    j.bellM.emissiveIntensity=0.25+0.15*Math.sin(t*2+j.ph);
+  }
+  for(const sc of schools){
+    sc.x+=Math.cos(sc.drift)*0.3*dt; sc.z+=Math.sin(sc.drift)*0.3*dt;
+    if(Math.hypot(sc.x,sc.z)>500) sc.drift=Math.atan2(-sc.z,-sc.x);
+    sc.grp.position.set(sc.x, waveH(sc.x,sc.z,t)+0.12, sc.z);
+    for(const d2 of sc.darts){
+      const a=t*d2.spd+d2.ph;
+      d2.m.position.set(Math.cos(a)*d2.r, 0, Math.sin(a)*d2.r*0.7);
+      d2.m.rotation.z=-a;
+      d2.m.material.opacity=(0.30+0.22*Math.sin(a*3))*lastDayness;
+    }
+  }
+  for(const h of herons) h.g.rotation.y += Math.sin(t*0.13+h.ph)*dt*0.05;
+  for(const rb of rowboats){
+    rb.g.position.y=waveH(rb.g.position.x,rb.g.position.z,t)+0.08;
+    rb.g.rotation.z=Math.sin(t*0.9+rb.ph)*0.05;
+  }
+}
+
 // ---------- LIFE: things that move, things that react ----------
 // flags — every one agrees with the wind
 const flagGeo = (()=>{ const g=new THREE.BufferGeometry();
@@ -2070,6 +2238,12 @@ function makeVillager(col, sitting){
   }
   const body=new THREE.Mesh(new THREE.CylinderGeometry(0.15,0.19,0.5,7), cloth);
   body.position.y=sitting?0.28:0.62; g.add(body);
+  for(const ax of [-1,1]){
+    const arm=new THREE.Mesh(new THREE.CylinderGeometry(0.045,0.05,0.38,5), cloth);
+    arm.position.set(ax*0.20, sitting?0.30:0.62, 0);
+    arm.rotation.z=ax*0.28;
+    g.add(arm);
+  }
   const head=new THREE.Mesh(new THREE.SphereGeometry(0.15,8,6), skin);
   head.position.y=sitting?0.66:1.0; g.add(head);
   const hat=new THREE.Mesh(new THREE.ConeGeometry(0.20,0.17,8),
@@ -2490,6 +2664,7 @@ function updateLife(dt){
   updateRainbow(dt);
   updateTufts();
   updateGlints(dt);
+  updateOceanLife(dt);
   for(const sp of spinners) sp.m.rotation.z += sp.spd*dt;
   updateBeachGulls(dt);
   // festival lanterns ride the evening tide
@@ -2789,6 +2964,17 @@ function nearestShadow(maxD){
 let levi=null;
 function maybeLeviathan(dt){
   const h=S.hour;
+  if(finaleLeviRequest && !levi){
+    finaleLeviRequest=false;
+    const mesh=new THREE.Mesh(shadowGeo,new THREE.MeshBasicMaterial({color:0x04080e,transparent:true,opacity:0,depthWrite:false}));
+    mesh.rotation.x=-Math.PI/2; mesh.scale.set(26,8,1);
+    const ang=Math.random()*Math.PI*2;
+    mesh.position.set(S.boat.x+Math.cos(ang)*28, 0.2, S.boat.z+Math.sin(ang)*28);
+    mesh.rotation.z=-(ang+Math.PI/2);
+    scene.add(mesh);
+    levi={mesh, dir:ang+Math.PI/2, age:0};
+    sfxLow();
+  }
   if(levi){
     levi.mesh.position.x += Math.cos(levi.dir)*4*dt;
     levi.mesh.position.z += Math.sin(levi.dir)*4*dt;
@@ -2959,22 +3145,38 @@ function applyTimeOfDay(){
 // ---------- audio ----------
 // CC0 samples from opengameart.org (see audio/CREDITS.txt) layered over the procedural bed
 let AC=null, waveGain=null;
-const SAMPLES={ music:'audio/music-seaside.flac',
+const SAMPLES={ music:'audio/music-seaside.flac', night:'audio/music-night.ogg', grottoM:'audio/music-grotto.mp3',
+  festivalM:'audio/music-festival.mp3', harvestM:'audio/music-harvest.mp3',
   wave1:'audio/wave1.flac', wave2:'audio/wave2.flac', wave3:'audio/wave3.flac', wave4:'audio/wave4.flac',
   gull1:'audio/gull1.wav', gull2:'audio/gull2.wav', gull3:'audio/gull3.wav',
   splash1:'audio/splash1.ogg', splash2:'audio/splash2.ogg', splash3:'audio/splash3.ogg',
   rain:'audio/rain-loop.ogg', lap:'audio/lap-loop.ogg' };
 const buffers={};
 let musicGain=null, lapGain=null, rainGain=null, masterGain=null;
+let musicSrc=null, musicCur=null, musicSwitchTo=null;
+const MUSIC_VOL={music:0.13, night:0.10, grottoM:0.13, festivalM:0.16, harvestM:0.15};
 function loadSamples(){
   for(const [k,url] of Object.entries(SAMPLES)){
     fetch(url).then(r=>r.arrayBuffer()).then(ab=>AC.decodeAudioData(ab)).then(b=>{
       buffers[k]=b;
-      if(k==='music'){ const s=AC.createBufferSource(); s.buffer=b; s.loop=true; s.connect(musicGain); s.start(); }
       if(k==='lap'){ const s=AC.createBufferSource(); s.buffer=b; s.loop=true; s.connect(lapGain); s.start(); }
       if(k==='rain'){ const s=AC.createBufferSource(); s.buffer=b; s.loop=true; s.connect(rainGain); s.start(); }
     }).catch(()=>{});
   }
+}
+function startMusicLoop(name){
+  if(musicSrc){ try{ musicSrc.stop(); }catch(e){} }
+  const s=AC.createBufferSource(); s.buffer=buffers[name]; s.loop=true;
+  s.connect(musicGain); s.start();
+  musicSrc=s; musicCur=name;
+}
+// the sea scores itself — day, night, festivals, and the grotto each have a voice
+function pickMusic(){
+  if(grottoSite && Math.hypot(S.boat.x-grottoSite.x, S.boat.z-grottoSite.z)<26) return 'grottoM';
+  if(festToday && (S.hour>=17||S.hour<2)) return 'festivalM';
+  if(harvestToday && S.hour>=8 && S.hour<18) return 'harvestM';
+  if(S.hour>=20.5||S.hour<5.5) return 'night';
+  return 'music';
 }
 function playBuf(name, vol=0.2, rate=1){
   if(!AC||S.muted||!buffers[name]) return;
@@ -3004,9 +3206,14 @@ function updateAudio(dt){
   if(!AC) return;
   const mute=S.muted?0:1;
   const day = S.hour>=6 && S.hour<20;
-  // music carries the day, then stands aside for the night sounds
-  const mTarget = mute * (S.settings.music?1:0) * (day?0.13:0.035) * (S.mode==='docked'?1.15:1);
-  musicGain.gain.value += (mTarget-musicGain.gain.value)*Math.min(1,dt*0.5);
+  // context music with a gentle crossfade
+  const desired=pickMusic();
+  if(desired!==musicCur && buffers[desired] && !musicSwitchTo) musicSwitchTo=desired;
+  if(!musicSrc && buffers[desired]) startMusicLoop(desired);
+  if(musicSwitchTo && musicGain.gain.value<0.006){ startMusicLoop(musicSwitchTo); musicSwitchTo=null; }
+  const mTarget = musicSwitchTo ? 0 :
+    mute * (S.settings.music?1:0) * (MUSIC_VOL[musicCur]||0.13) * (S.mode==='docked'?1.15:1);
+  musicGain.gain.value += (mTarget-musicGain.gain.value)*Math.min(1,dt*(musicSwitchTo?1.6:0.5));
   // water lapping — louder when slow and near land
   let shoreD=1e9; for(const i of islands) shoreD=Math.min(shoreD, Math.hypot(S.boat.x-i.x,S.boat.z-i.z)-i.r);
   const lapT = mute * (0.05 + 0.10*THREE.MathUtils.clamp(1-shoreD/30,0,1)) * (1-Math.min(1,Math.abs(S.boat.speed)/9)*0.5);
@@ -3081,8 +3288,44 @@ function runQuests(){
     save();
   }
 }
+// the long way home — the game's three great works, and what the sea does when you finish them
+function longGoals(){
+  const towns=islands.filter(isl=>folkList.some(f=>f.isl===isl.name && (S.folk[f.key]||{warmth:0}).warmth>=6)).length;
+  const species=Object.keys(S.codex).length;
+  const omens=[S.leviathanSeen,S.omens.aurora,S.omens.dolphins,S.omens.rainbow,S.omens.springFound,S.omens.grottoFound].filter(Boolean).length;
+  return {towns, townsMax:islands.length, species, speciesMax:Object.keys(SPECIES).length, omens, omensMax:6};
+}
+let finaleLeviRequest=false;
+function checkFinale(){
+  if(S.finaleSeen) return;
+  const g=longGoals();
+  if(g.towns>=g.townsMax && g.species>=g.speciesMax && g.omens>=g.omensMax
+     && S.weather==='clear' && (S.hour>=21.5||S.hour<3)){
+    S.finaleSeen=true;
+    auroraTonight=true;
+    if(festGroup) festGroup.visible=true;
+    finaleLeviRequest=true;
+    cinema(24);
+    $('daycard').innerHTML=`Keeper of the Quiet Sea<div style="font-size:15px;margin-top:8px;opacity:0.85;">You befriended every shore, named every fish,<br>and witnessed all the sky's quiet miracles.<br><br>The sea knows your sail now. The mornings keep coming.</div>`;
+    $('daycard').style.opacity='1'; dayCardT=14;
+    toast('The sky is awake, the lanterns are lit, and something vast rises gently to see you off — or see you home.', true);
+    sfxLow();
+    save();
+  }
+}
 function renderJournal(){
-  const jq=$('journal-quests'); jq.innerHTML='<div style="color:var(--gold);font-style:italic;font-size:13px;margin-bottom:6px;">Your goals</div>';
+  const jq=$('journal-quests');
+  const lg=longGoals();
+  jq.innerHTML=`<div style="color:var(--gold);font-style:italic;font-size:13px;margin-bottom:6px;">The long way home</div>
+    <div style="font-size:12px;color:var(--dim);line-height:1.6;margin-bottom:8px;">They say the sea answers anyone who manages all three. No hurry — the fish aren't going anywhere.</div>
+    <div style="font-size:12.5px;line-height:2;">
+      <span style="color:${lg.towns>=lg.townsMax?'var(--teal)':'var(--cream)'}">${lg.towns>=lg.townsMax?'✓':'◈'} A true friend on every island — ${lg.towns}/${lg.townsMax}</span><br>
+      <span style="color:${lg.species>=lg.speciesMax?'var(--teal)':'var(--cream)'}">${lg.species>=lg.speciesMax?'✓':'◈'} Every fish in the codex — ${lg.species}/${lg.speciesMax}</span><br>
+      <span style="color:${lg.omens>=lg.omensMax?'var(--teal)':'var(--cream)'}">${lg.omens>=lg.omensMax?'✓':'◈'} All six of the sea's quiet wonders — ${lg.omens}/${lg.omensMax}</span>
+    </div>
+    ${S.finaleSeen?'<div style="font-size:12px;color:var(--gold);font-style:italic;margin-top:6px;">The sea has answered. Keeper of the Quiet Sea.</div>':''}
+    <div style="height:12px;"></div>
+    <div style="color:var(--gold);font-style:italic;font-size:13px;margin-bottom:6px;">Your next steps</div>`;
   QUESTS.forEach((q,i)=>{
     const row=document.createElement('div');
     row.style.cssText='font-size:12.5px;padding:3px 0;color:'+(i<S.questIdx?'var(--teal)':i===S.questIdx?'var(--cream)':'var(--dim)');
@@ -4252,7 +4495,7 @@ function tick(dtOverride){
       b.spot.material.opacity=b.spotO*0.8;
     }
     uiTick+=dt;
-    if(uiTick>0.2){ uiTick=0; updateHUD(); updateTracker(); updatePrompts(); runQuests(); }
+    if(uiTick>0.2){ uiTick=0; updateHUD(); updateTracker(); updatePrompts(); runQuests(); checkFinale(); }
     saveTick+=dt;
     if(saveTick>12){ saveTick=0; save(); }
   } else {
@@ -4289,11 +4532,12 @@ function initFreshState(){
     pieceSeq:1,contractSeq:1,lastRegenDay:1,
     omens:{aurora:false, rainbow:false, dolphins:false, deepHint:false},
     hull:100, stats:{sold:0, delivered:0}, questIdx:0,
-    folk:{}, paint:{hull:'#24525a', cabin:'#bdae8f', trim:'#523b24', glass:'warm', wake:'classic'}});
+    folk:{}, paint:{hull:'#24525a', cabin:'#bdae8f', trim:'#523b24', glass:'warm', wake:'classic'},
+    finaleSeen:false});
 }
 function buildAll(){
   genWorld(); buildIslands(); buildBoat(); buildRain(); buildGulls();
-  buildAIBoat(); buildFogBanks(); buildAurora(); buildRainbow(); placeVillagers(); buildTufts(); buildFolk();
+  buildAIBoat(); buildFogBanks(); buildAurora(); buildRainbow(); placeVillagers(); buildTufts(); buildFolk(); buildOceanLife();
   refreshDaily();
   applyPaint();
 }
@@ -4369,8 +4613,15 @@ window.__dbg={
   cine(){ cinema(6); },
   wind(){ return windDir; },
   day(n){ S.day=n; refreshDaily(); updateHUD(); },
+  goals(){ return longGoals(); },
+  grantAll(){ // stage the finale conditions for testing
+    for(const id of Object.keys(SPECIES)) S.codex[id]=S.codex[id]||1;
+    Object.keys(S.omens).forEach(k=>S.omens[k]=true); S.leviathanSeen=true;
+    islands.forEach((isl,i)=>{ const f=folkList.find(x=>x.isl===isl.name); if(f) S.folk[f.key].warmth=6; });
+    renderCodex();
+  },
   sites(){ return {wreck:wreckSite, spring:springSite, grotto:grottoSite, fest:festToday, market:marketIslName, colliders:hardColliders.length}; },
-  audio(){ return {ctx:AC?AC.state:'none', loaded:Object.keys(buffers), music:musicGain?+musicGain.gain.value.toFixed(3):null, lap:lapGain?+lapGain.gain.value.toFixed(3):null, rain:rainGain?+rainGain.gain.value.toFixed(3):null}; },
+  audio(){ return {ctx:AC?AC.state:'none', loaded:Object.keys(buffers), track:musicCur, want:pickMusic(), music:musicGain?+musicGain.gain.value.toFixed(3):null, lap:lapGain?+lapGain.gain.value.toFixed(3):null, rain:rainGain?+rainGain.gain.value.toFixed(3):null}; },
   sky(){ return {auroraTonight, planes:auroraGroup?auroraGroup.children.map(p=>({o:+p.material.opacity.toFixed(3), pos:p.getWorldPosition(new THREE.Vector3()).toArray().map(v=>v|0)})):null, cam:camera.position.toArray().map(v=>v|0)}; },
   money(n){ S.money=n; updateHUD(); },
   tp(name){ const i=islands.find(x=>x.name.toLowerCase().includes(name.toLowerCase())); if(i){ S.boat.x=i.dockX; S.boat.z=i.dockZ; snapCamera(); } },

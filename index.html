@@ -230,7 +230,9 @@
     Fish swim as <b>dark shadows</b> in the fishing grounds — the bright turquoise shallows around
     islands, the green kelp beds, the coral reefs, and (with a Longline) the dark Deeps.
     Drift up <b>slowly</b> — a fast wake scatters them. Within reach, press <b>E</b> to cast, then
-    hit <b>Space</b> when the needle crosses the glowing arc. Rarer fish fight harder.<br><br>
+    hit <b>Space</b> when the needle crosses the glowing arc. The strong ones then <b>run</b>:
+    hold Space to reel while they're calm, let go when they fight, and watch the line tension —
+    a snapped line just means a fish with a story.<br><br>
     <div style="color:var(--gold);font-style:italic;margin-bottom:2px;">Money</div>
     Fish sell at any dock market — <b>fresher is worth more</b> (the Ice Box helps). Delivery
     contracts pay reliably, with a bonus if you arrive before dusk. Money buys the shipwright's
@@ -2066,7 +2068,8 @@ function hideCast(){
 function updateCast(){
   if(!bobber) return;
   const t=waterUni.uTime.value;
-  bobber.position.y=waveH(bobber.position.x,bobber.position.z,t)+0.13 + (ring.hits>0?Math.sin(t*16)*0.07:0);
+  const thrash = (ring.phase==='reel'&&ring.reel&&ring.reel.fighting) ? Math.sin(t*20)*0.14 : (ring.hits>0?Math.sin(t*16)*0.07:0);
+  bobber.position.y=waveH(bobber.position.x,bobber.position.z,t)+0.13 + thrash;
   _rodTip.set(0.72,0.30,-2.98); boat.localToWorld(_rodTip);
   const p=castLine.geometry.attributes.position;
   p.setXYZ(0,_rodTip.x,_rodTip.y,_rodTip.z);
@@ -2254,14 +2257,17 @@ function makeVillager(col, sitting){
   }
   const body=new THREE.Mesh(new THREE.CylinderGeometry(0.15,0.19,0.5,7), cloth);
   body.position.y=sitting?0.28:0.62; g.add(body);
+  const arms=[];
   for(const ax of [-1,1]){
     const arm=new THREE.Mesh(new THREE.CylinderGeometry(0.045,0.05,0.38,5), cloth);
-    arm.position.set(ax*0.20, sitting?0.30:0.62, 0);
+    arm.geometry.translate(0,-0.16,0);   // pivot at the shoulder so waves hinge right
+    arm.position.set(ax*0.20, sitting?0.44:0.78, 0);
     arm.rotation.z=ax*0.28;
-    g.add(arm);
+    g.add(arm); arms.push(arm);
   }
   const head=new THREE.Mesh(new THREE.SphereGeometry(0.15,8,6), skin);
   head.position.y=sitting?0.66:1.0; g.add(head);
+  g.userData={head, armL:arms[0], armR:arms[1]};
   const hat=new THREE.Mesh(new THREE.ConeGeometry(0.20,0.17,8),
     new THREE.MeshStandardMaterial({color:0x9a7a3a,roughness:1}));
   hat.position.y=sitting?0.78:1.12; g.add(hat);
@@ -2282,18 +2288,22 @@ function placeVillagers(){
   const lg=new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0.1,0.9,1.15), new THREE.Vector3(0.12,-1.05,1.3)]);
   sit.add(new THREE.Line(lg,new THREE.LineBasicMaterial({color:0x9aa4ac,transparent:true,opacity:0.45})));
   scene.add(sit); villagers.push({g:sit,type:'sit',ph:0.7});
-  // someone up by the cottages who watches you come in
+  // someone up by the cottages who watches you come in, and strolls the green
   const stand=makeVillager(0x4a6a7a,false);
   const cr=home.r*0.52;
   stand.position.set(home.x+Math.cos(ang+0.55)*cr, groundY(home,cr)-0.05, home.z+Math.sin(ang+0.55)*cr);
-  scene.add(stand); villagers.push({g:stand,type:'stand',ph:2.1});
+  scene.add(stand);
+  villagers.push({g:stand,type:'stand',ph:2.1, isl:home,
+    patrol:[[stand.position.x,stand.position.z],
+      [home.x+Math.cos(ang+0.95)*cr, home.z+Math.sin(ang+0.95)*cr]],
+    ptT:4, walking:false, target:1, waveEnd:0, waveCd:0});
   // one more on the second island's dock
   if(islands[1]){
     const i2=islands[1];
     const a2=Math.atan2(i2.dockZ-i2.z, i2.dockX-i2.x);
     const st2=makeVillager(0x6a7a4a,false);
     st2.position.set(i2.x+Math.cos(a2)*(i2.r*0.82+2), 1.18, i2.z+Math.sin(a2)*(i2.r*0.82+2));
-    scene.add(st2); villagers.push({g:st2,type:'stand',ph:3.9});
+    scene.add(st2); villagers.push({g:st2,type:'stand',ph:3.9, waveEnd:0, waveCd:0});
   }
   // the dock cat (there should always be a dock cat)
   const cat=new THREE.Group();
@@ -2305,24 +2315,63 @@ function placeVillagers(){
     ear.position.set(ex,0.29,0.20); cat.add(ear);
   }
   const tail=new THREE.Mesh(new THREE.CylinderGeometry(0.015,0.02,0.28,4), catM);
-  tail.position.set(0,0.2,-0.22); tail.rotation.x=0.5; cat.add(tail);
-  cat.position.set(home.x+px*(home.r*0.82+0.8)+qx*0.75, 1.66, home.z+pz*(home.r*0.82+0.8)+qz*0.75);
+  tail.geometry.translate(0,0.12,0);
+  tail.position.set(0,0.14,-0.22); tail.rotation.x=0.5; cat.add(tail);
+  cat.userData={tail};
+  const catX=home.x+px*(home.r*0.82+0.8)+qx*0.75, catZ=home.z+pz*(home.r*0.82+0.8)+qz*0.75;
+  cat.position.set(catX, 1.66, catZ);
   cat.rotation.y=ang+2.2;
-  scene.add(cat); villagers.push({g:cat,type:'cat',ph:5.2});
+  scene.add(cat);
+  villagers.push({g:cat,type:'cat',ph:5.2, fixedY:1.66,
+    patrol:[[catX,catZ],[catX+px*3.2,catZ+pz*3.2]],
+    ptT:6, walking:false, target:1, waveEnd:0, waveCd:0});
 }
 function updateVillagers(dt){
   const t=waterUni.uTime.value;
   const late=(S.hour>=21||S.hour<5);
   for(const v of villagers){
     if(v.type!=='cat') v.g.visible=!late;   // folk head indoors; the cat keeps her own hours
-    v.g.rotation.z=Math.sin(t*1.1+v.ph)*0.025;
+    if(!v.g.visible) continue;
+    const ud=v.g.userData||{};
+    // small signs of being alive — breath, a wandering gaze, a restless tail
+    v.g.scale.y=1+0.015*Math.sin(t*1.7+v.ph);
+    if(ud.head) ud.head.rotation.y=Math.sin(t*0.35+v.ph)*0.45;
+    if(ud.tail) ud.tail.rotation.z=Math.sin(t*3+v.ph)*0.35;
+    const d=Math.hypot(S.boat.x-v.g.position.x, S.boat.z-v.g.position.z);
+    // a wave for an arriving sail
     if(v.type==='stand'){
-      const d=Math.hypot(S.boat.x-v.g.position.x, S.boat.z-v.g.position.z);
-      if(d<28){
+      if(d<16 && t>(v.waveCd||0)){ v.waveEnd=t+2.2; v.waveCd=t+34; }
+      if(ud.armR) ud.armR.rotation.z = (t<(v.waveEnd||0)) ? (-2.5+Math.sin(t*11)*0.3) : -0.28;
+      if(d<28 && !v.walking){
         const ty=Math.atan2(S.boat.x-v.g.position.x, S.boat.z-v.g.position.z);
         let dh=ty-v.g.rotation.y; while(dh>Math.PI)dh-=Math.PI*2; while(dh<-Math.PI)dh+=Math.PI*2;
         v.g.rotation.y+=dh*Math.min(1,dt*2);
       }
+    }
+    // a stroll between two favorite spots
+    if(v.patrol && t>(v.waveEnd||0) && d>10){
+      if(!v.walking){
+        v.ptT-=dt;
+        if(v.ptT<=0){ v.walking=true; v.target=1-v.target; }
+        v.g.rotation.z=Math.sin(t*1.1+v.ph)*0.025;
+      } else {
+        const tx=v.patrol[v.target][0], tz=v.patrol[v.target][1];
+        const dx=tx-v.g.position.x, dz=tz-v.g.position.z, dd=Math.hypot(dx,dz);
+        if(dd<0.15){ v.walking=false; v.ptT=4+Math.random()*7; }
+        else{
+          const sp2=v.type==='cat'?0.9:0.5;
+          v.g.position.x+=dx/dd*sp2*dt; v.g.position.z+=dz/dd*sp2*dt;
+          v.g.rotation.y=Math.atan2(dx,dz);
+          v.g.rotation.z=Math.sin(t*9)*0.05;
+          if(v.fixedY!==undefined) v.g.position.y=v.fixedY+Math.abs(Math.sin(t*9))*0.03;
+          else if(v.isl){
+            const rr=Math.hypot(v.g.position.x-v.isl.x, v.g.position.z-v.isl.z);
+            v.g.position.y=groundY(v.isl,rr)-0.05+Math.abs(Math.sin(t*9))*0.04;
+          }
+        }
+      }
+    } else if(!v.walking){
+      v.g.rotation.z=Math.sin(t*1.1+v.ph)*0.025;
     }
   }
 }
@@ -3512,7 +3561,9 @@ function refreshHoldUI(){
 }
 
 // ---------- fishing minigame ----------
-const ring={active:false,species:null,shadowRef:null,needle:0,speed:200,arcStart:0,arcW:60,hits:0,need:1,dir:1};
+const ring={active:false,species:null,shadowRef:null,needle:0,speed:200,arcStart:0,arcW:60,hits:0,need:1,dir:1,
+  phase:'ring', reel:null};
+let touchReel=false;
 function startFishing(target){
   S.mode='fishing';
   const id=target.sh.species;
@@ -3526,6 +3577,7 @@ function startFishing(target){
   }
   ring.hits=0; ring.needle=Math.random()*360; ring.dir=1;
   ring.arcStart=Math.random()*360;
+  ring.phase='ring'; ring.reel=null;
   const cdx=S.boat.x-target.sh.x, cdz=S.boat.z-target.sh.z, cdd=Math.hypot(cdx,cdz)||1;
   showCast(target.sh.x+cdx/cdd*1.1, target.sh.z+cdz/cdd*1.1);
   $('ring-label').textContent = id==='bottle'?'Something glints…':'Something\'s circling…';
@@ -3533,7 +3585,9 @@ function startFishing(target){
 }
 function endFishing(caught){
   ring.active=false;
+  ring.phase='ring'; ring.reel=null; touchReel=false;
   $('ring-ui').style.display='none';
+  $('ring-sub').textContent='SPACE when the needle crosses the glow · ESC to let it go';
   hideCast();
   if(caught){ let n=0; for(const gu of gulls){ if(n>=3) break; gu.follow=40; n++; } }
   const tgt=ring.shadowRef;
@@ -3565,8 +3619,59 @@ function endFishing(caught){
     S.mode='sail';
   }
 }
+let reelClickT=0, strainT=0;
 function updateRing(dt){
   if(!ring.active) return;
+  if(ring.phase==='reel'){
+    const r=ring.reel;
+    r.stateT-=dt;
+    if(r.stateT<=0){
+      r.fighting=!r.fighting;
+      r.stateT = r.fighting ? (0.9+Math.random()*1.1) : (1.2+Math.random()*1.4);
+      if(r.fighting && bobber){ spawnSplash(bobber.position.x, bobber.position.z, 0.5); }
+      $('ring-label').textContent = r.fighting ? 'It fights — let it tire!' : 'Reel it in!';
+    }
+    const reeling = keys['Space']||touchReel;
+    if(r.fighting){
+      if(reeling){ r.tension+=dt*52*r.tRate; r.dist-=dt*4; }
+      else{ r.tension-=dt*34; r.dist+=dt*8; }
+    } else {
+      if(reeling){ r.tension+=dt*12*r.tRate; r.dist-=dt*26; }
+      else{ r.tension-=dt*42; r.dist+=dt*2.5; }
+    }
+    if(reeling){ reelClickT-=dt; if(reelClickT<=0){ reelClickT=0.13; sfx(1350,0.03,'square',0.035); } }
+    if(r.tension>78){ strainT-=dt; if(strainT<=0){ strainT=0.3; sfx(150,0.18,'sawtooth',0.05); } }
+    r.tension=THREE.MathUtils.clamp(r.tension,0,100);
+    if(r.tension>=100){ r.snapT+=dt; if(r.snapT>0.7){ endFishing(false); return; } }
+    else r.snapT=Math.max(0,r.snapT-dt*2);
+    if(r.dist<=0){ endFishing(true); return; }
+    if(r.dist>=r.maxDist){ endFishing(false); return; }
+    if(r.fighting) camShake=Math.max(camShake,0.10);
+    // draw the fight
+    const cv=$('ring-canvas'), ctx=cv.getContext('2d');
+    ctx.clearRect(0,0,280,280);
+    ctx.beginPath(); ctx.arc(140,140,130,0,Math.PI*2); ctx.fillStyle='rgba(10,16,26,0.72)'; ctx.fill();
+    // the line, the hook, the fish
+    ctx.strokeStyle='rgba(242,233,216,0.30)'; ctx.lineWidth=2;
+    ctx.beginPath(); ctx.moveTo(42,120); ctx.lineTo(238,120); ctx.stroke();
+    ctx.fillStyle='#e8b64c';
+    ctx.beginPath(); ctx.arc(42,120,6,0,Math.PI*2); ctx.fill();
+    const fx=42+(r.dist/r.maxDist)*196;
+    const wig=r.fighting?Math.sin(waterUni.uTime.value*22)*6:0;
+    ctx.fillStyle=r.fighting?'#e07a5f':'#9fc4d8';
+    ctx.beginPath();
+    ctx.ellipse(fx,120+wig,13,7,0,0,Math.PI*2);
+    ctx.moveTo(fx+11,120+wig); ctx.lineTo(fx+21,113+wig); ctx.lineTo(fx+21,127+wig); ctx.closePath();
+    ctx.fill();
+    // tension
+    ctx.fillStyle='rgba(242,233,216,0.14)'; ctx.fillRect(42,168,196,14);
+    const tc=r.tension<60?'#5fb8a6':r.tension<85?'#e8b64c':'#e07a5f';
+    ctx.fillStyle=(r.snapT>0&&Math.sin(waterUni.uTime.value*30)>0)?'#ff4a3a':tc;
+    ctx.fillRect(42,168,196*(r.tension/100),14);
+    ctx.font='11px Segoe UI'; ctx.fillStyle='rgba(242,233,216,0.6)'; ctx.textAlign='center';
+    ctx.fillText('line tension',140,198);
+    return;
+  }
   ring.needle=(ring.needle+ring.speed*dt*ring.dir+360)%360;
   const cv=$('ring-canvas'), ctx=cv.getContext('2d');
   const cx=140,cy=140,R=104;
@@ -3594,12 +3699,21 @@ function updateRing(dt){
   }
 }
 function ringPress(){
-  if(!ring.active) return;
+  if(!ring.active || ring.phase!=='ring') return;
   const rel=((ring.needle-ring.arcStart)%360+360)%360;
   if(rel>=0&&rel<=ring.arcW){
     ring.hits++;
     sfxTick();
-    if(ring.hits>=ring.need){ endFishing(true); return; }
+    if(ring.hits>=ring.need){
+      // hooked! commons come straight up; the strong ones RUN
+      const sp=ring.species?SPECIES[ring.species]:null;
+      if(sp && sp.ring.hits>=2){
+        startReel(sp);
+      } else {
+        endFishing(true);
+      }
+      return;
+    }
     ring.arcW=Math.max(26,ring.arcW*0.72);
     ring.arcStart=Math.random()*360;
     ring.dir*=-1;
@@ -3608,6 +3722,19 @@ function ringPress(){
   } else {
     endFishing(false);
   }
+}
+function startReel(sp){
+  ring.phase='reel';
+  const rare=sp.rar==='rare';
+  ring.reel={
+    dist: rare?110:70, maxDist: rare?150:110,
+    tension:20, snapT:0,
+    fighting:false, stateT:1.0+Math.random(),
+    tRate: (rare?1.15:1.0)*(S.upgrades.lures?0.85:1),
+  };
+  $('ring-label').textContent='It runs!';
+  $('ring-sub').textContent='hold SPACE to reel · let go when it fights';
+  playBuf('splash'+(1+((Math.random()*3)|0)), 0.2, 0.85);
 }
 
 // ---------- placing a catch ----------
@@ -4288,11 +4415,18 @@ if(matchMedia('(pointer:coarse)').matches){
   };
   bindHold('t-left','KeyA'); bindHold('t-right','KeyD'); bindHold('t-go','KeyW');
   $('t-act').addEventListener('touchstart',e=>{ e.preventDefault();
+    if(ring.active && ring.phase==='reel'){ touchReel=true; return; }
     if(ring.active){ ringPress(); return; }
     window.dispatchEvent(new KeyboardEvent('keydown',{code:'KeyE'}));
   },{passive:false});
+  $('t-act').addEventListener('touchend',()=>{ touchReel=false; });
 }
-$('ring-canvas').addEventListener('pointerdown',()=>{ if(ring.active) ringPress(); });
+$('ring-canvas').addEventListener('pointerdown',()=>{
+  if(!ring.active) return;
+  if(ring.phase==='reel'){ touchReel=true; return; }
+  ringPress();
+});
+addEventListener('pointerup',()=>{ touchReel=false; });
 function openPause(){ if(S.mode!=='sail'||titleMode) return; paused=true; $('pause-panel').style.display='block'; hidePrompt(); }
 function closePause(){ paused=false; $('pause-panel').style.display='none'; $('settings-panel').style.display='none'; }
 $('pause-resume').addEventListener('click',closePause);
@@ -4354,7 +4488,9 @@ addEventListener('keydown',(e)=>{
   }
   if(e.code==='Space'){
     e.preventDefault();
-    if(S.mode==='fishing'){ ringPress(); return; }
+    keys['Space']=true;
+    if(S.mode==='fishing' && ring.phase==='ring' && !e.repeat){ ringPress(); }
+    return;
   }
   if(e.code==='KeyE'){
     if(S.mode==='sail'){
@@ -4727,6 +4863,9 @@ window.__dbg={
     beginPlacing({id:S.pieceSeq++,kind:'fish',species:id,cells:sp.cells,rot:0,pos:null,caughtDay:S.day,caughtHour:S.hour}); },
   cast(){ const t=nearestShadow(50); if(t){ S.boat.x=t.sh.x-5; S.boat.z=t.sh.z; S.boat.speed=0; startFishing(t); return t.sh.species; } return 'no shadow'; },
   win(){ if(ring.active){ ring.hits=ring.need; endFishing(true); } },
+  hook(){ if(ring.active&&ring.phase==='ring'){ ring.hits=ring.need-1; ring.needle=ring.arcStart+ring.arcW/2; ringPress(); return ring.phase; } },
+  reelState(){ return ring.reel?{phase:ring.phase, dist:+ring.reel.dist.toFixed(1), tension:+ring.reel.tension.toFixed(1), fighting:ring.reel.fighting}:{phase:ring.phase, active:ring.active}; },
+  reelHold(v){ keys['Space']=!!v; },
   state(){ return {mode:S.mode, day:S.day, hour:S.hour.toFixed(2), weather:S.weather, money:S.money,
     pieces:S.pieces.length, shadows:zones.reduce((s,z)=>s+z.shadows.length,0), boat:{x:S.boat.x|0,z:S.boat.z|0},
     islands:islands.map(i=>({name:i.name,x:i.x|0,z:i.z|0}))}; },

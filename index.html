@@ -166,6 +166,7 @@
   <div class="hud-chip"><span id="hud-sun">☀️</span> <span id="hud-clock">Day 1 · 06:00</span></div>
   <div class="hud-chip" id="hud-weather">🌤️ Clear</div>
   <div class="hud-chip">🛠️ <b id="hud-hull">100%</b></div>
+  <div class="hud-chip" title="the day's wind">💨 <span id="hud-wind" style="display:inline-block;transition:transform .3s;">➤</span> <b id="hud-windlabel"></b></div>
 </div>
 <div class="hud" id="hud-tr">
   <button class="hud-btn" id="btn-hold">Hold<span class="key">Tab</span></button>
@@ -205,6 +206,7 @@
   <div class="tabs" id="dock-tabs"></div>
   <div id="dock-body"></div>
   <div class="dock-footer">
+    <button class="btn" id="btn-banner" style="display:none;"></button>
     <button class="btn" id="btn-repair" style="display:none;"></button>
     <button class="btn teal" id="btn-sleep">🌙 Rest until dawn</button>
     <button class="btn" id="btn-depart">⛵ Cast off</button>
@@ -241,6 +243,10 @@
     Time of day and weather decide what's biting. Some fish want dawn, some want rain on the
     night sea, one wants a starless overcast midnight in the deepest water. The codex (<b>C</b>)
     keeps your hints.<br><br>
+    <div style="color:var(--gold);font-style:italic;margin-bottom:2px;">The wind</div>
+    Every flag in the islands tells the same truth. Run <b>fair</b> (wind at your back) and she
+    surges; beat into a <b>foul</b> wind and she trudges — worse in weather. Check the 💨 chip,
+    plan your loop with the wind, and let it bring you home. Weather Canvas eases the beating.<br><br>
     <div style="color:var(--gold);font-style:italic;margin-bottom:2px;">The hull</div>
     Rocks and hard landings chip the hull. Below 30% she slows; at zero she limps. Any dock
     patches her up for a few coins. Nothing you carry is ever lost.
@@ -386,7 +392,7 @@ const S = {
   omens:{aurora:false, rainbow:false, dolphins:false, deepHint:false},
   hull:100, stats:{sold:0, delivered:0}, questIdx:0,
   folk:{}, paint:{hull:'#24525a', cabin:'#bdae8f', trim:'#523b24', glass:'warm', wake:'classic'},
-  finaleSeen:false,
+  finaleSeen:false, patron:{},
 };
 let titleMode=true, paused=false;
 
@@ -399,7 +405,7 @@ function save(){
     codex:S.codex, curios:S.curios, notesRead:S.notesRead, leviathanSeen:S.leviathanSeen,
     boat:{x:S.boat.x,z:S.boat.z,heading:S.boat.heading}, pieceSeq:S.pieceSeq, contractSeq:S.contractSeq, lastRegenDay:S.lastRegenDay,
     settings:S.settings, omens:S.omens, hull:S.hull, stats:S.stats, questIdx:S.questIdx,
-    folk:S.folk, paint:S.paint, finaleSeen:S.finaleSeen,
+    folk:S.folk, paint:S.paint, finaleSeen:S.finaleSeen, patron:S.patron,
   })); }catch(e){}
 }
 function loadSave(){
@@ -419,6 +425,7 @@ function loadSave(){
     S.questIdx=d.questIdx||0;
     S.folk=d.folk||{};
     S.finaleSeen=!!d.finaleSeen;
+    S.patron=d.patron||{};
     S.paint=Object.assign({hull:'#24525a', cabin:'#bdae8f', trim:'#523b24', glass:'warm', wake:'classic'}, d.paint||{});
     return true;
   }catch(e){ return false; }
@@ -812,6 +819,7 @@ const beamPivots=[];
 let lightHouseLamp=null;
 const windowMats=[], dockLights=[], landMats=[], buoyMats=[], buoys=[], outcrops=[], kelpFronds=[], kelpPads=[];
 const flags=[], chimneys=[], villagers=[], windowPoolMats=[], beachGulls=[], kelpFish=[], spinners=[];
+const townBannerBuilders={};
 const festMats=[], festLanterns=[];
 let festGroup=null, festGroup2=null, festToastDone=false, harvToastDone=false, harvestToday=false;
 let windDir=0, auroraTonight=false, duskTintR=1, duskTintB=1;
@@ -1207,6 +1215,25 @@ function buildIslands(){
         groundY(isl,sgR)-0.12, isl.z+Math.sin(dockAng)*sgR+Math.sin(dockAng+Math.PI/2)*2.4);
       sign.rotation.y=Math.PI/2-dockAng;
       setCast(sign); scene.add(sign);
+      // a patron can raise the town banner — pennants that fly forever after
+      const buildBannerFn=()=>{
+        const bp=new THREE.Group();
+        const pole=new THREE.Mesh(new THREE.CylinderGeometry(0.08,0.1,4.4,6), woodLM);
+        pole.position.y=2.2; bp.add(pole);
+        const cols=[0xc85a4a,0xe8c04a,0x5fb8a6,0x8a6ac8];
+        for(let i=0;i<5;i++){
+          const pen=new THREE.Mesh(flagGeo, new THREE.MeshBasicMaterial({color:cols[i%4], side:THREE.DoubleSide}));
+          pen.scale.setScalar(0.55);
+          pen.position.set(0, 4.1-i*0.6, 0);
+          bp.add(pen);
+          flags.push({m:pen, ph:i*1.2});
+        }
+        const bAng=dockAng-0.35, bR=isl.r*0.78;
+        bp.position.set(isl.x+Math.cos(bAng)*bR, groundY(isl,bR)-0.1, isl.z+Math.sin(bAng)*bR);
+        setCast(bp); scene.add(bp);
+      };
+      townBannerBuilders[isl.name]=buildBannerFn;
+      if(S.patron && S.patron[isl.name]) buildBannerFn();
     }
     // lighthouse on home
     if(isl.home){
@@ -3333,6 +3360,14 @@ function updateHUD(){
   const hh=$('hud-hull');
   hh.textContent=`${S.hull}%`;
   hh.style.color=S.hull>60?'var(--teal)':S.hull>30?'var(--gold)':'var(--rose)';
+  // wind arrow, relative to the bow — green at your back, red on the nose
+  const windTravelAng=Math.PI/2-windDir;
+  const rel=windTravelAng-S.boat.heading;
+  $('hud-wind').style.transform=`rotate(${(-rel*180/Math.PI).toFixed(0)}deg)`;
+  const wa=windAlign();
+  const wl=$('hud-windlabel');
+  wl.textContent = wa>0.35?'fair' : wa<-0.35?'foul' : 'abeam';
+  wl.style.color = wa>0.35?'var(--teal)' : wa<-0.35?'var(--rose)' : 'var(--dim)';
   const h=S.hour;
   $('hud-sun').textContent = (h>=20.5||h<5)?'🌙':(h<6.5||h>=18)?'🌆':'☀️';
   $('hud-weather').textContent = S.weather==='rain'?'🌧️ Rain':S.weather==='overcast'?'☁️ Overcast':'🌤️ Clear';
@@ -3419,6 +3454,22 @@ function updateTracker(){
     row.innerHTML=`<span class="arrow" style="transform:rotate(${(-rel*180/Math.PI).toFixed(0)}deg)">➤</span>
       📦 <b>${c.to}</b> · ${Math.round(d)}m · $${c.reward}${bonusLive?` <span style="color:var(--teal)">+$${c.bonus} by dusk</span>`:''}`;
     tr.appendChild(row);
+  }
+  // the Gull's Eye reads working water
+  if(S.upgrades.gulleye && S.mode==='sail'){
+    let best=null, bd=65;
+    for(const z of zones){
+      if(!z.shadows.length) continue;
+      const d=Math.hypot(S.boat.x-z.x, S.boat.z-z.z);
+      if(d>12 && d<bd){ bd=d; best=z; }
+    }
+    if(best){
+      const bearing=Math.atan2(best.x-S.boat.x, best.z-S.boat.z);
+      const rel=bearing-S.boat.heading;
+      const row=document.createElement('div'); row.className='track-row';
+      row.innerHTML=`<span class="arrow" style="transform:rotate(${(-rel*180/Math.PI).toFixed(0)}deg)">➤</span> 🐦 gulls working · ${Math.round(bd)}m`;
+      tr.appendChild(row);
+    }
   }
   for(const f of folkList){
     const st=S.folk[f.key];
@@ -3573,7 +3624,8 @@ function startFishing(target){
     ring.species=null; ring.speed=140; ring.arcW=85; ring.need=1;
   } else {
     const sp=SPECIES[id];
-    ring.species=id; ring.speed=sp.ring.speed; ring.arcW=sp.ring.arc*(S.upgrades.lures?1.25:1); ring.need=sp.ring.hits;
+    ring.species=id; ring.speed=sp.ring.speed; ring.arcW=sp.ring.arc*(S.upgrades.lures?1.25:1);
+    ring.need=Math.max(1, sp.ring.hits-(S.upgrades.barbed?1:0));
   }
   ring.hits=0; ring.needle=Math.random()*360; ring.dir=1;
   ring.arcStart=Math.random()*360;
@@ -3797,7 +3849,7 @@ function genContracts(){
   S.contracts=[];
   const R=mulberry32(worldSeed+S.day*131);
   for(const isl of islands){
-    const n = isl.home?2:(R()<0.7?1:2);
+    const n = (isl.home?2:(R()<0.7?1:2)) + (S.upgrades.pennant?1:0);
     for(let i=0;i<n;i++){
       const dests=islands.filter(x=>x!==isl);
       const to=dests[Math.floor(R()*dests.length)];
@@ -3808,6 +3860,7 @@ function genContracts(){
     }
   }
 }
+function contractPay(v){ return Math.round(v*(S.upgrades.pennant?1.2:1)); }
 function rollWeather(R){
   const r=R();
   return r<0.55?'clear':r<0.8?'overcast':'rain';
@@ -3978,6 +4031,7 @@ function openDock(isl){
   $('dock-sub').textContent = isl.home?'Home port · the light is always on':'A quiet harbor';
   $('btn-sleep').style.display='inline-block';
   updateRepairBtn(isl);
+  updateBannerBtn(isl);
   dockTab = 'market'; folkView=null;
   renderDockTabs(isl);
   renderDockBody(isl);
@@ -3999,9 +4053,9 @@ let folkView=null;
 function renderDockBody(isl){
   const body=$('dock-body'); body.innerHTML='';
   const harvestHere=harvestToday && islands[2] && isl.name===islands[2].name;
-  const mk=(marketIslName && isl.name===marketIslName)?1.35:(harvestHere?1.25:1);
+  const mk=((marketIslName && isl.name===marketIslName)?1.35:(harvestHere?1.25:1))*(S.patron[isl.name]?1.05:1);
   if(dockTab==='market'){
-    if(mk>1){
+    if((marketIslName && isl.name===marketIslName)||harvestHere){
       const note=document.createElement('div'); note.className='empty-note';
       note.style.cssText='color:var(--gold);padding:4px 6px 10px;';
       note.textContent=harvestHere&&mk===1.25?'🌾 Harvest day — the market pays +25% here today.':'🎪 Market day — everything sells +35% here today.';
@@ -4042,7 +4096,7 @@ function renderDockBody(isl){
     for(const c of here){
       const row=document.createElement('div'); row.className='row';
       const bonusLive = c.day===S.day && S.hour<20;
-      const pay=c.reward+(bonusLive?c.bonus:0);
+      const pay=contractPay(c.reward+(bonusLive?c.bonus:0));
       row.innerHTML=`<div class="info"><div class="name">📦 Delivery from ${c.from}</div>
         <div class="meta">${bonusLive?'on time — bonus included!':'made it, a little late'}</div></div><div class="price">$${pay}</div>`;
       const b=document.createElement('button'); b.className='btn teal'; b.textContent='Deliver';
@@ -4061,7 +4115,7 @@ function renderDockBody(isl){
       const row=document.createElement('div'); row.className='row';
       const w=Math.max(...c.shape.map(x=>x[1]))+1, h=Math.max(...c.shape.map(x=>x[0]))+1;
       row.innerHTML=`<div class="info"><div class="name">📦 Crate to ${c.to}</div>
-        <div class="meta">${w}×${h} crate · +$${c.bonus} if there by dusk</div></div><div class="price">$${c.reward}</div>`;
+        <div class="meta">${w}×${h} crate · +$${contractPay(c.bonus)} if there by dusk</div></div><div class="price">$${contractPay(c.reward)}</div>`;
       const b=document.createElement('button'); b.className='btn'; b.textContent='Accept';
       b.addEventListener('click',()=>{
         const piece={id:S.pieceSeq++, kind:'crate', contractId:c.id, cells:c.shape, rot:0, pos:null};
@@ -4226,6 +4280,11 @@ function renderDockBody(isl){
       {key:'silent',  name:'Silent Prop',    icon:'🌀', cost:240, desc:'Barely a ripple. Fish let you drift much closer.'},
       {key:'longline',name:'Longline Rig',   icon:'🎣', cost:260, desc:'Reaches the fathomless water. The Deeps open up.'},
       {key:'hold2',   name:'Great Hold',     icon:'🗄️', cost:420, desc:'Tear out the bulkheads — 5×4 becomes 6×5.', needs:'hold'},
+      {key:'canvas',  name:'Weather Canvas', icon:'⛵', cost:300, desc:'Cut sails for foul wind. Headwind slows you half as much.'},
+      {key:'keel',    name:'Deep Keel',      icon:'🪵', cost:280, desc:'Oak where it counts. Collisions bruise the hull half as hard.'},
+      {key:'gulleye', name:'Gull\'s Eye',    icon:'🐦', cost:350, desc:'Read the birds. A marker points to working water nearby.'},
+      {key:'barbed',  name:'Barbed Hooks',   icon:'🪝', cost:400, desc:'Once they\'re on, they stay on. Every fish needs one less strike.'},
+      {key:'pennant', name:'Merchant\'s Pennant', icon:'🚩', cost:450, desc:'A known flag. Contracts pay +20% and boards offer more work.'},
     ];
     for(const u of UP){
       const owned=S.upgrades[u.key];
@@ -4259,6 +4318,21 @@ function updateRepairBtn(isl){
     S.money-=cost; S.hull=100; sfxCoin();
     toast('Good as new. Well — good enough.');
     updateHUD(); updateRepairBtn(isl); save();
+  };
+}
+function updateBannerBtn(isl){
+  const b=$('btn-banner');
+  if(S.patron[isl.name]){ b.style.display='none'; return; }
+  b.style.display='inline-block';
+  b.textContent='🏳️ Raise the town banner — $400';
+  b.disabled=S.money<400;
+  b.onclick=()=>{
+    if(S.money<400) return;
+    S.money-=400; S.patron[isl.name]=true; sfxCoin();
+    if(townBannerBuilders[isl.name]) townBannerBuilders[isl.name]();
+    for(const f of folkList){ if(f.isl===isl.name && S.folk[f.key]) S.folk[f.key].warmth++; }
+    toast(`${isl.name} raises your banner. The whole town will remember this.`, true);
+    updateHUD(); updateBannerBtn(isl); save();
   };
 }
 $('btn-depart').addEventListener('click',closeDock);
@@ -4513,6 +4587,15 @@ addEventListener('keydown',(e)=>{
 addEventListener('keyup',(e)=>{ keys[e.code]=false; });
 
 // ---------- boat physics ----------
+// alignment of travel with the day's wind: +1 dead downwind, -1 straight into it
+function windAlign(){ return Math.sin(S.boat.heading + windDir); }
+function windFactor(){
+  const power = S.weather==='rain'?0.30 : S.weather==='overcast'?0.26 : 0.18;
+  const a = windAlign();
+  const penaltyScale = (a<0 && S.upgrades.canvas) ? 0.5 : 1;   // Weather Canvas eases the beating
+  const gust = 1 + 0.04*Math.sin(waterUni.uTime.value*0.3);
+  return (1 + power*a*penaltyScale) * gust;
+}
 let camShake=0, lastBumpT=0, bumpToastDone=false;
 function collide(impact){
   const now=performance.now();
@@ -4524,7 +4607,7 @@ function collide(impact){
   for(let i=0;i<5;i++) spawnDroplet(bowX,0.6,bowZ,(Math.random()-0.5)*2,1.5+Math.random()*1.5,(Math.random()-0.5)*2,0.3);
   sfx(64,0.28,'triangle',0.3); setTimeout(()=>sfx(42,0.4,'sine',0.22),40);
   playBuf('splash'+(1+((Math.random()*3)|0)),0.25,0.8);
-  const dmg=Math.round(Math.max(0,(impact-2.2))*2.4);
+  const dmg=Math.round(Math.max(0,(impact-2.2))*2.4*(S.upgrades.keel?0.5:1));
   if(dmg>0){
     S.hull=Math.max(0,S.hull-dmg);
     if(!bumpToastDone){ bumpToastDone=true; toast('Ow — mind the hull. Any dock can patch her up.'); }
@@ -4536,8 +4619,10 @@ function updateBoat(dt){
   if(S.mode!=='sail'){ S.boat.speed*=Math.max(0,1-dt*2); }
   else{
     const hullF = S.hull<=0?0.4 : S.hull<30?0.65 : 1;   // a wounded hull limps
-    const maxV = (S.upgrades.engine?11.5:8)*hullF;
-    const acc = (S.upgrades.engine?5.5:3.8)*hullF;
+    // the wind is honest now: run with it and she surges, beat against it and she trudges
+    const wf = windFactor();
+    const maxV = (S.upgrades.engine?11.5:8)*hullF*wf;
+    const acc = (S.upgrades.engine?5.5:3.8)*hullF*Math.max(0.7,wf);
     const fwd = (keys['KeyW']||keys['ArrowUp'])?1:(keys['KeyS']||keys['ArrowDown'])?-0.45:0;
     if(fwd!==0) S.boat.speed += acc*fwd*dt;
     else S.boat.speed *= Math.max(0,1-dt*0.55);
@@ -4759,7 +4844,7 @@ function initFreshState(){
     omens:{aurora:false, rainbow:false, dolphins:false, deepHint:false},
     hull:100, stats:{sold:0, delivered:0}, questIdx:0,
     folk:{}, paint:{hull:'#24525a', cabin:'#bdae8f', trim:'#523b24', glass:'warm', wake:'classic'},
-    finaleSeen:false});
+    finaleSeen:false, patron:{}});
 }
 function buildAll(){
   genWorld(); buildIslands(); buildBoat(); buildRain(); buildGulls();
@@ -4840,6 +4925,10 @@ window.__dbg={
   card(){ showDayCard(); },
   cine(){ cinema(6); },
   wind(){ return windDir; },
+  windTest(){ const cur=S.boat.heading; const out={};
+    S.boat.heading=Math.PI/2-windDir; out.fair=+windFactor().toFixed(3);
+    S.boat.heading=Math.PI/2-windDir+Math.PI; out.foul=+windFactor().toFixed(3);
+    S.boat.heading=cur; out.align=+windAlign().toFixed(3); return out; },
   day(n){ S.day=n; refreshDaily(); updateHUD(); },
   goals(){ return longGoals(); },
   render(){ return {calls:renderer.info.render.calls, tris:renderer.info.render.triangles, geoms:renderer.info.memory.geometries, texs:renderer.info.memory.textures}; },

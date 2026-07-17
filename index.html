@@ -390,7 +390,7 @@ const S = {
   muted:false, leviathanTonight:false, lastRegenDay:0,
   settings:{vol:0.8, music:true, post:true, sway:true, sharp:'balanced'},
   omens:{aurora:false, rainbow:false, dolphins:false, deepHint:false},
-  hull:100, stats:{sold:0, delivered:0}, questIdx:0,
+  hull:100, stats:{sold:0, delivered:0, smooth:0}, questIdx:0, records:{},
   folk:{}, paint:{hull:'#24525a', cabin:'#bdae8f', trim:'#523b24', glass:'warm', wake:'classic'},
   finaleSeen:false, patron:{},
 };
@@ -405,7 +405,7 @@ function save(){
     codex:S.codex, curios:S.curios, notesRead:S.notesRead, leviathanSeen:S.leviathanSeen,
     boat:{x:S.boat.x,z:S.boat.z,heading:S.boat.heading}, pieceSeq:S.pieceSeq, contractSeq:S.contractSeq, lastRegenDay:S.lastRegenDay,
     settings:S.settings, omens:S.omens, hull:S.hull, stats:S.stats, questIdx:S.questIdx,
-    folk:S.folk, paint:S.paint, finaleSeen:S.finaleSeen, patron:S.patron,
+    folk:S.folk, paint:S.paint, finaleSeen:S.finaleSeen, patron:S.patron, records:S.records,
   })); }catch(e){}
 }
 function loadSave(){
@@ -426,6 +426,8 @@ function loadSave(){
     S.folk=d.folk||{};
     S.finaleSeen=!!d.finaleSeen;
     S.patron=d.patron||{};
+    S.records=d.records||{};
+    S.stats.smooth=S.stats.smooth||0;
     S.paint=Object.assign({hull:'#24525a', cabin:'#bdae8f', trim:'#523b24', glass:'warm', wake:'classic'}, d.paint||{});
     return true;
   }catch(e){ return false; }
@@ -837,6 +839,7 @@ function refreshDaily(){
   festToastDone=false; harvToastDone=false;
   if(festGroup) festGroup.visible=festToday;
   if(festGroup2) festGroup2.visible=harvestToday;
+  rollRumor();
 }
 // push dome vertices around radially so islands stop being perfect spheres
 function bumpy(geo, amp, seed){
@@ -2723,7 +2726,7 @@ function showDayCard(){
   const from=(windDir+Math.PI)%(Math.PI*2);
   const dirName=COMPASS[Math.round(from/(Math.PI/4))%8];
   const wx=S.weather==='rain'?'rain':S.weather==='overcast'?'overcast':'clear skies';
-  $('daycard').innerHTML=`Day ${S.day}<div style="font-size:15px;margin-top:6px;opacity:0.8;">${wx} · wind from the ${dirName}${marketIslName?` · market day at ${marketIslName}`:''}${festToday?' · 🏮 festival tonight':''}${harvestToday&&islands[2]?` · 🌾 harvest at ${islands[2].name}`:''}</div>`;
+  $('daycard').innerHTML=`Day ${S.day}<div style="font-size:15px;margin-top:6px;opacity:0.8;">${wx} · wind from the ${dirName}${marketIslName?` · market day at ${marketIslName}`:''}${festToday?' · 🏮 festival tonight':''}${harvestToday&&islands[2]?` · 🌾 harvest at ${islands[2].name}`:''}${rumorLabel?`<div style="font-size:13px;margin-top:4px;opacity:0.65;font-style:italic;">word at the dock: ${rumorLabel}</div>`:''}</div>`;
   $('daycard').style.opacity='1';
   dayCardT=4;
 }
@@ -2754,6 +2757,7 @@ function updateLife(dt){
   updateLightning(dt);
   updateAurora(dt,night);
   updateRainbow(dt);
+  updateEncounters(dt);
   updateTufts();
   updateGlints(dt);
   updateOceanLife(dt);
@@ -2948,7 +2952,8 @@ function eligibleSpecies(zone){
     if(zone.grotto && sp.biome!==zone.biome) continue;   // the quiet room keeps its own company
     if(sp.biome!=='any' && sp.biome!==zone.biome) continue;
     if(!speciesActive(sp)) continue;
-    const w = sp.rar==='common'?10 : sp.rar==='uncommon'?4 : 1.4;
+    let w = sp.rar==='common'?10 : sp.rar==='uncommon'?4 : 1.4;
+    if(zone===rumorZone && id===rumorSpecies) w*=3;   // the morning's word is good
     out.push({id,w});
   }
   return out;
@@ -2964,10 +2969,11 @@ function updateShadows(dt){
         const sh=z.shadows[i];
         if(sh.species!=='bottle' && !speciesActive(SPECIES[sh.species])){ despawnShadow(z,i); }
       }
-      if(z.shadows.length>=3) continue;
+      const frenzyHere = encounter && encounter.type==='frenzy' && z===encounter.zone;
+      if(z.shadows.length>=(frenzyHere?6:3)) continue;
       const elig = eligibleSpecies(z);
       if(!elig.length) continue;
-      if(Math.random()<0.55){
+      if(Math.random()<(frenzyHere?0.95:0.55)){
         let id;
         if(Math.random()<(z.wreck?0.16:0.035)){ id='bottle'; }
         else{
@@ -2977,14 +2983,16 @@ function updateShadows(dt){
         }
         const a=Math.random()*Math.PI*2;
         const rr=z.inner + Math.random()*(z.outer-z.inner);
-        const size = id==='bottle'?0.9 : 1.1+(SPECIES[id].cells.length*0.35);
+        // once in a while, the shadow is simply BIGGER
+        const trophy = id!=='bottle' && Math.random()<0.08;
+        const size = (id==='bottle'?0.9 : 1.1+(SPECIES[id].cells.length*0.35)) * (trophy?1.5:1);
         const mesh = new THREE.Mesh(shadowGeo, new THREE.MeshBasicMaterial({map:shadowTexture,transparent:true,opacity:0.5,depthWrite:false}));
         mesh.rotation.x=-Math.PI/2; mesh.scale.set(size*1.6,size,1);
         // "nervous water" — an expanding ripple ring betrays the fish beneath
         const ripple = new THREE.Mesh(rippleGeo, new THREE.MeshBasicMaterial({color:0xdce8ec,transparent:true,opacity:0,depthWrite:false}));
         ripple.position.z = 0.02; mesh.add(ripple);
         scene.add(mesh);
-        z.shadows.push({species:id, x:z.x+Math.cos(a)*rr, z:z.z+Math.sin(a)*rr,
+        z.shadows.push({species:id, trophy, x:z.x+Math.cos(a)*rr, z:z.z+Math.sin(a)*rr,
           dir:Math.random()*Math.PI*2, speed:0.5+Math.random()*0.6, state:'wander', mesh, ripple, size, phase:Math.random()*10});
       }
     }
@@ -3455,6 +3463,18 @@ function updateTracker(){
       📦 <b>${c.to}</b> · ${Math.round(d)}m · $${c.reward}${bonusLive?` <span style="color:var(--teal)">+$${c.bonus} by dusk</span>`:''}`;
     tr.appendChild(row);
   }
+  // something's happening out there
+  if(encounter && S.mode==='sail'){
+    const label = encounter.type==='frenzy' ? `🐟 frenzy near ${encounter.isl}!`
+      : encounter.type==='salvage' ? '🪙 something adrift'
+      : encounter.towed ? '🛟 towing — any dock' : '🛟 someone adrift';
+    const bearing=Math.atan2(encounter.x-S.boat.x, encounter.z-S.boat.z);
+    const rel=bearing-S.boat.heading;
+    const d=Math.hypot(S.boat.x-encounter.x, S.boat.z-encounter.z);
+    const row=document.createElement('div'); row.className='track-row';
+    row.innerHTML=`<span class="arrow" style="transform:rotate(${(-rel*180/Math.PI).toFixed(0)}deg)">➤</span> <b>${label}</b>${encounter.towed?'':' · '+Math.round(d)+'m'}`;
+    tr.appendChild(row);
+  }
   // the Gull's Eye reads working water
   if(S.upgrades.gulleye && S.mode==='sail'){
     let best=null, bd=65;
@@ -3520,7 +3540,7 @@ function freshness(p){
 }
 function fishPrice(p){
   const sp=SPECIES[p.species];
-  return Math.round(sp.base*(0.72+0.55*freshness(p))*(S.upgrades.ledger?1.1:1));
+  return Math.round(sp.base*(0.72+0.55*freshness(p))*(S.upgrades.ledger?1.1:1)*(p.size||1));
 }
 const CELL=47; // 44 + 3 gap
 let holdUI={holding:null, ghostRot:0, container:null, onPlace:null, hoverCell:null};
@@ -3630,6 +3650,9 @@ function startFishing(target){
   ring.hits=0; ring.needle=Math.random()*360; ring.dir=1;
   ring.arcStart=Math.random()*360;
   ring.phase='ring'; ring.reel=null;
+  ring.trophy=!!target.sh.trophy;
+  if(ring.trophy) $('ring-label').textContent='Something HEAVY is circling…';
+  if(target.zone && encounter && encounter.type==='frenzy' && target.zone===encounter.zone) ring.arcW*=1.2;
   const cdx=S.boat.x-target.sh.x, cdz=S.boat.z-target.sh.z, cdd=Math.hypot(cdx,cdz)||1;
   showCast(target.sh.x+cdx/cdd*1.1, target.sh.z+cdz/cdd*1.1);
   $('ring-label').textContent = id==='bottle'?'Something glints…':'Something\'s circling…';
@@ -3660,8 +3683,16 @@ function endFishing(caught){
       S.codex[id]=(S.codex[id]||0)+1;
       if(S.codex[id]===1) toast(`New codex entry — ${sp.name}!`);
       spawnCatchArc(tgt.sh.x, tgt.sh.z, sp.color);
+      // every fish rolls a size; trophies roll heavy
+      const sz=+(ring.trophy ? (1.35+Math.random()*0.35) : (0.65+Math.random()*0.65)).toFixed(2);
+      const prevBest=S.records[id]||0;
+      if(sz>prevBest){
+        S.records[id]=sz;
+        if(prevBest>0 && sz>=1.0) toast(`A personal best ${sp.name} — ×${sz.toFixed(2)}!`);
+      }
+      if(ring.trophy) sfxCoin();
       const piece={id:S.pieceSeq++, kind:'fish', species:id, cells:sp.cells, rot:0, pos:null,
-        caughtDay:S.day, caughtHour:S.hour};
+        caughtDay:S.day, caughtHour:S.hour, size:sz};
       setTimeout(()=>beginPlacing(piece), 640);
     }
     save();
@@ -3757,9 +3788,9 @@ function ringPress(){
     ring.hits++;
     sfxTick();
     if(ring.hits>=ring.need){
-      // hooked! commons come straight up; the strong ones RUN
+      // hooked! commons come straight up; the strong ones — and every trophy — RUN
       const sp=ring.species?SPECIES[ring.species]:null;
-      if(sp && sp.ring.hits>=2){
+      if(sp && (sp.ring.hits>=2 || ring.trophy)){
         startReel(sp);
       } else {
         endFishing(true);
@@ -3778,11 +3809,12 @@ function ringPress(){
 function startReel(sp){
   ring.phase='reel';
   const rare=sp.rar==='rare';
+  const tro=ring.trophy?1.4:1;
   ring.reel={
-    dist: rare?110:70, maxDist: rare?150:110,
+    dist: (rare?110:70)*tro, maxDist: (rare?150:110)*tro,
     tension:20, snapT:0,
     fighting:false, stateT:1.0+Math.random(),
-    tRate: (rare?1.15:1.0)*(S.upgrades.lures?0.85:1),
+    tRate: (rare?1.15:1.0)*(ring.trophy?1.1:1)*(S.upgrades.lures?0.85:1),
   };
   $('ring-label').textContent='It runs!';
   $('ring-sub').textContent='hold SPACE to reel · let go when it fights';
@@ -4015,6 +4047,129 @@ function maybeFolkRequest(f){
 }
 function heldOf(sp){ return S.pieces.filter(p=>p.kind==='fish'&&p.species===sp).length; }
 
+// ---------- the sea's dice: rumors and encounters ----------
+let rumorZone=null, rumorSpecies=null, rumorLabel='';
+function rollRumor(){
+  rumorZone=null; rumorSpecies=null; rumorLabel='';
+  const Rr=mulberry32(worldSeed+S.day*331);
+  if(Rr()<0.75 && zones.length){
+    const cands=zones.filter(z=>!z.grotto&&!z.wreck);
+    const zn=cands[(Rr()*cands.length)|0];
+    const ids=Object.keys(SPECIES).filter(id=>{const sp=SPECIES[id];return (sp.biome==='any'||sp.biome===zn.biome)&&sp.rar!=='rare';});
+    if(ids.length){
+      rumorZone=zn; rumorSpecies=ids[(Rr()*ids.length)|0];
+      let best=null,bd=1e9;
+      for(const i of islands){const d=Math.hypot(zn.x-i.x,zn.z-i.z); if(d<bd){bd=d;best=i;}}
+      rumorLabel=`${SPECIES[rumorSpecies].name} running ${zn.biome==='kelp'?'in the kelp':zn.biome==='reef'?'over the reef':zn.biome==='deep'?'in the deeps':'in the shallows'} near ${best.name}`;
+    }
+  }
+}
+let encounter=null, encounterT=180, smoothToastDay=0;
+function spawnEncounter(force){
+  const roll = force==='frenzy'?0.9 : force==='salvage'?0.2 : force==='castaway'?0.5 : Math.random();
+  if(roll>=0.7){
+    const cands=zones.filter(z2=>!z2.grotto);
+    const zn=cands[(Math.random()*cands.length)|0];
+    let best=null,bd=1e9;
+    for(const i of islands){const d=Math.hypot(zn.x-i.x,zn.z-i.z); if(d<bd){bd=d;best=i;}}
+    const marker=new THREE.Mesh(new THREE.RingGeometry(0.94,1.0,40),
+      new THREE.MeshBasicMaterial({color:0xeef6f0,transparent:true,opacity:0.25,depthWrite:false}));
+    marker.rotation.x=-Math.PI/2; marker.position.set(zn.x,0.45,zn.z);
+    scene.add(marker);
+    encounter={type:'frenzy', zone:zn, marker, x:zn.x, z:zn.z, age:0, dur:110, isl:best.name};
+    toast(`Gulls are wheeling near ${best.name} — the water's boiling with fish!`, true);
+    return;
+  }
+  let x,z,ok=false;
+  for(let t=0;t<20&&!ok;t++){
+    const a=Math.random()*Math.PI*2, d=45+Math.random()*85;
+    x=S.boat.x+Math.cos(a)*d; z=S.boat.z+Math.sin(a)*d;
+    ok = Math.hypot(x,z)<480 && islands.every(i=>Math.hypot(x-i.x,z-i.z)>i.r+14);
+  }
+  if(!ok) return;
+  if(roll<0.4){
+    const g=new THREE.Group();
+    const crate=new THREE.Mesh(new THREE.BoxGeometry(0.9,0.9,0.9),
+      new THREE.MeshStandardMaterial({color:0x8a6a42,roughness:1}));
+    crate.rotation.set(0.15,0.6,0.1); g.add(crate);
+    const rope=new THREE.Mesh(new THREE.TorusGeometry(0.5,0.05,5,12),
+      new THREE.MeshStandardMaterial({color:0x5a4a34,roughness:1}));
+    rope.rotation.x=Math.PI/2; rope.position.y=0.25; g.add(rope);
+    g.position.set(x,0,z);
+    scene.add(g);
+    encounter={type:'salvage', g, x, z, age:0};
+    toast('Something bobs adrift on the swell — worth a look.', true);
+  } else {
+    const g=new THREE.Group();
+    const rowM=new THREE.MeshStandardMaterial({color:0x6a4a32,roughness:1,side:THREE.DoubleSide});
+    const hull=new THREE.Mesh(new THREE.LatheGeometry([new THREE.Vector2(0.01,-0.2),new THREE.Vector2(0.42,-0.15),new THREE.Vector2(0.52,0.14)],10), rowM);
+    hull.scale.set(1,1,2.2); g.add(hull);
+    const soul=makeVillager(0x7a6a4a,true);
+    soul.scale.setScalar(0.85); soul.position.y=0.05; g.add(soul);
+    g.position.set(x,0,z);
+    scene.add(g);
+    encounter={type:'castaway', g, x, z, age:0, towed:false};
+    toast("A rowboat drifts out past the shallows — someone's waving.", true);
+  }
+}
+function endEncounter(){
+  if(!encounter) return;
+  if(encounter.g) scene.remove(encounter.g);
+  if(encounter.marker){ scene.remove(encounter.marker); encounter.marker.material.dispose(); }
+  encounter=null;
+}
+function collectSalvage(){
+  const roll=Math.random();
+  if(roll<0.55){
+    const amt=15+((Math.random()*26)|0);
+    S.money+=amt; sfxCoin();
+    toast(`Salvage! $${amt}, sealed in wax paper.`);
+  } else if(roll<0.8){
+    endEncounter(); openBottle(false); updateHUD(); save(); return;
+  } else {
+    const commons=Object.keys(SPECIES).filter(id=>SPECIES[id].rar==='common');
+    const gid=commons[(Math.random()*commons.length)|0];
+    const piece={id:S.pieceSeq++, kind:'fish', species:gid, cells:SPECIES[gid].cells, rot:0, pos:null, caughtDay:S.day, caughtHour:S.hour, size:1};
+    const spot=findSpot(piece);
+    if(spot){ piece.pos=spot.pos; piece.rot=spot.rot; S.pieces.push(piece);
+      toast(`A cold-box, still sealed — one ${SPECIES[gid].name} inside!`); }
+    else { S.money+=18; sfxCoin(); toast('A cold-box — but the hold is full, so you sell it dockside. $18.'); }
+  }
+  endEncounter(); updateHUD(); save();
+}
+function updateEncounters(dt){
+  if(!encounter){
+    encounterT-=dt;
+    if(encounterT<=0){ encounterT=230+Math.random()*180; if(S.mode==='sail') spawnEncounter(); }
+    return;
+  }
+  const t=waterUni.uTime.value;
+  encounter.age+=dt;
+  if(encounter.type==='frenzy'){
+    if(encounter.marker){
+      const pu=(t*0.5)%1;
+      encounter.marker.scale.setScalar(encounter.zone.outer*(0.6+pu*0.5));
+      encounter.marker.material.opacity=0.22*(1-pu);
+    }
+    if(encounter.age>encounter.dur){ toast('The water settles again.'); endEncounter(); }
+    return;
+  }
+  if(encounter.type==='castaway' && encounter.towed){
+    const tx=S.boat.x-Math.sin(S.boat.heading)*7, tz=S.boat.z-Math.cos(S.boat.heading)*7;
+    encounter.x+=(tx-encounter.x)*Math.min(1,dt*1.8);
+    encounter.z+=(tz-encounter.z)*Math.min(1,dt*1.8);
+  } else {
+    encounter.x+=Math.cos(windDir)*0.25*dt;
+    encounter.z+=Math.sin(windDir)*0.25*dt;
+  }
+  if(encounter.g){
+    encounter.g.position.set(encounter.x, waveH(encounter.x,encounter.z,t)+0.05, encounter.z);
+    if(encounter.towed) encounter.g.rotation.y=S.boat.heading;
+    else encounter.g.rotation.y+=dt*0.08;
+  }
+  if(encounter.type==='salvage' && encounter.age>500) endEncounter();
+}
+
 // ---------- docking ----------
 let dockTab='market';
 function nearDock(){
@@ -4032,6 +4187,17 @@ function openDock(isl){
   $('btn-sleep').style.display='inline-block';
   updateRepairBtn(isl);
   updateBannerBtn(isl);
+  // a towed castaway comes ashore; a clean approach gets noticed
+  if(encounter && encounter.type==='castaway' && encounter.towed){
+    S.money+=60; sfxCoin();
+    for(const f of folkList){ if(f.isl===isl.name && S.folk[f.key]) S.folk[f.key].warmth++; }
+    toast(`${isl.name} takes the castaway in. $60 for the tow — and the town remembers.`, true);
+    endEncounter();
+  }
+  if(Math.abs(S.boat.speed)<1.2 && smoothToastDay!==S.day){
+    smoothToastDay=S.day; S.stats.smooth++;
+    toast('Glass-smooth landing.');
+  }
   dockTab = 'market'; folkView=null;
   renderDockTabs(isl);
   renderDockBody(isl);
@@ -4076,8 +4242,8 @@ function renderDockBody(isl){
       const sp=SPECIES[p.species]; const fr=freshness(p); const price=Math.round(fishPrice(p)*mk);
       total+=price;
       row.innerHTML=`<div class="info"><div class="name">${sp.icon} ${sp.name}
-          <span class="fresh-tag ${fr>0.8?'fresh-hi':'fresh-lo'}">${fr>0.8?'fresh':fr>0.55?'day-old':'tired'}</span></div>
-        <div class="meta">${sp.rar} · ${p.cells.length} cell${p.cells.length>1?'s':''}</div></div>
+          <span class="fresh-tag ${fr>0.8?'fresh-hi':'fresh-lo'}">${fr>0.8?'fresh':fr>0.55?'day-old':'tired'}</span>${(p.size||1)>=1.25?` <span class="fresh-tag fresh-hi">big ×${p.size.toFixed(2)}</span>`:''}</div>
+        <div class="meta">${sp.rar} · ${p.cells.length} cell${p.cells.length>1?'s':''}${(p.size||1)<0.8?' · a little one':''}</div></div>
         <div class="price">$${price}</div>`;
       const b=document.createElement('button'); b.className='btn'; b.textContent='Sell';
       b.addEventListener('click',()=>{ S.money+=price; S.stats.sold++; S.pieces=S.pieces.filter(x=>x.id!==p.id); sfxCoin(); updateHUD(); renderDockBody(isl); save(); });
@@ -4372,7 +4538,7 @@ function renderCodex(){
     const card=document.createElement('div'); card.className='codex-card'+(n?'':' unknown');
     card.innerHTML=`<div class="codex-sil" style="background:${n?sp.color+'33':'rgba(242,233,216,0.06)'}">${n?sp.icon:'❔'}</div>
       <div><div class="cname">${n?sp.name:'???'}</div><div class="chint">${sp.hint}</div></div>
-      ${n?`<div class="count">×${n}</div>`:''}`;
+      ${n?`<div class="count">×${n}${S.records[id]?`<br><span style="color:var(--dim);">best ${S.records[id].toFixed(2)}</span>`:''}</div>`:''}`;
     g.appendChild(card);
   }
   // curios
@@ -4570,6 +4736,14 @@ addEventListener('keydown',(e)=>{
     if(S.mode==='sail'){
       const isl=nearDock();
       if(isl && Math.abs(S.boat.speed)<3){ openDock(isl); return; }
+      if(encounter && (encounter.type==='salvage'||(encounter.type==='castaway'&&!encounter.towed))){
+        const ed=Math.hypot(S.boat.x-encounter.x, S.boat.z-encounter.z);
+        if(ed<7 && Math.abs(S.boat.speed)<2.5){
+          if(encounter.type==='salvage') collectSalvage();
+          else { encounter.towed=true; toast('Tow line on — bring them in to any dock.'); }
+          return;
+        }
+      }
       const t=nearestShadow(9);
       if(t && Math.abs(S.boat.speed)<2.5){
         if(t.zone.biome==='deep' && !S.upgrades.longline){
@@ -4737,6 +4911,13 @@ function updatePrompts(){
   if(S.mode!=='sail'){ hidePrompt(); return; }
   const isl=nearDock();
   if(isl && Math.abs(S.boat.speed)<3){ showPrompt(`<span class="key">E</span> Dock at ${isl.name}`); return; }
+  if(encounter && (encounter.type==='salvage'||(encounter.type==='castaway'&&!encounter.towed))){
+    const ed=Math.hypot(S.boat.x-encounter.x, S.boat.z-encounter.z);
+    if(ed<7 && Math.abs(S.boat.speed)<2.5){
+      showPrompt(`<span class="key">E</span> ${encounter.type==='salvage'?'Haul it aboard':'Throw them a line'}`);
+      return;
+    }
+  }
   const t=nearestShadow(9);
   if(t){
     if(Math.abs(S.boat.speed)<2.5) showPrompt(`<span class="key">E</span> Cast the line`);
@@ -4842,7 +5023,7 @@ function initFreshState(){
     holdW:4,holdH:3,pieces:[],contracts:[],accepted:[],codex:{},curios:0,notesRead:[],leviathanSeen:false,
     pieceSeq:1,contractSeq:1,lastRegenDay:1,
     omens:{aurora:false, rainbow:false, dolphins:false, deepHint:false},
-    hull:100, stats:{sold:0, delivered:0}, questIdx:0,
+    hull:100, stats:{sold:0, delivered:0, smooth:0}, questIdx:0, records:{},
     folk:{}, paint:{hull:'#24525a', cabin:'#bdae8f', trim:'#523b24', glass:'warm', wake:'classic'},
     finaleSeen:false, patron:{}});
 }
@@ -4939,7 +5120,9 @@ window.__dbg={
     islands.forEach((isl,i)=>{ const f=folkList.find(x=>x.isl===isl.name); if(f) S.folk[f.key].warmth=6; });
     renderCodex();
   },
-  sites(){ return {wreck:wreckSite, spring:springSite, grotto:grottoSite, fest:festToday, market:marketIslName, colliders:hardColliders.length}; },
+  sites(){ return {wreck:wreckSite, spring:springSite, grotto:grottoSite, fest:festToday, market:marketIslName, colliders:hardColliders.length, rumor:rumorLabel}; },
+  event(type){ endEncounter(); spawnEncounter(type); return encounter?encounter.type:'failed'; },
+  eventState(){ return encounter?{type:encounter.type, x:encounter.x|0, z:encounter.z|0, towed:!!encounter.towed, age:+encounter.age.toFixed(1)}:null; },
   audio(){ return {ctx:AC?AC.state:'none', loaded:Object.keys(buffers), track:musicCur, want:pickMusic(), music:musicGain?+musicGain.gain.value.toFixed(3):null, lap:lapGain?+lapGain.gain.value.toFixed(3):null, rain:rainGain?+rainGain.gain.value.toFixed(3):null}; },
   sky(){ return {auroraTonight, planes:auroraGroup?auroraGroup.children.map(p=>({o:+p.material.opacity.toFixed(3), pos:p.getWorldPosition(new THREE.Vector3()).toArray().map(v=>v|0)})):null, cam:camera.position.toArray().map(v=>v|0)}; },
   money(n){ S.money=n; updateHUD(); },

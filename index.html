@@ -428,7 +428,7 @@ function loadSave(){
     S.patron=d.patron||{};
     S.records=d.records||{};
     S.stats.smooth=S.stats.smooth||0;
-    S.paint=Object.assign({hull:'#24525a', cabin:'#bdae8f', trim:'#523b24', glass:'warm', wake:'classic'}, d.paint||{});
+    S.paint=Object.assign({hull:'#24525a', cabin:'#bdae8f', trim:'#523b24', glass:'warm', wake:'classic', name:'Skipjack'}, d.paint||{});
     return true;
   }catch(e){ return false; }
 }
@@ -497,6 +497,44 @@ const sky = new THREE.Mesh(new THREE.SphereGeometry(900,24,16), new THREE.Shader
       gl_FragColor=vec4(col,1.0); }`
 }));
 scene.add(sky);
+
+// subtle tiling noise textures — flat color reads as vinyl up close; speckle reads as world
+function noiseTex(spots, spotAlpha, size){
+  const c=document.createElement('canvas'); c.width=c.height=size||128;
+  const x=c.getContext('2d');
+  x.fillStyle='#ffffff'; x.fillRect(0,0,c.width,c.height);
+  for(let i=0;i<spots;i++){
+    const g=Math.floor(190+Math.random()*50);
+    x.fillStyle=`rgba(${g},${g},${g},${spotAlpha})`;
+    x.beginPath();
+    x.arc(Math.random()*c.width, Math.random()*c.height, 0.6+Math.random()*1.8, 0, 6.28);
+    x.fill();
+  }
+  const t=new THREE.CanvasTexture(c);
+  t.wrapS=t.wrapT=THREE.RepeatWrapping;
+  t.colorSpace=THREE.SRGBColorSpace;
+  return t;
+}
+function grainTex(vertical){
+  const c=document.createElement('canvas'); c.width=c.height=128;
+  const x=c.getContext('2d');
+  x.fillStyle='#ffffff'; x.fillRect(0,0,128,128);
+  for(let i=0;i<26;i++){
+    const g=Math.floor(200+Math.random()*40);
+    x.strokeStyle=`rgba(${g},${g},${g},0.5)`;
+    x.lineWidth=1+Math.random()*2;
+    x.beginPath();
+    if(vertical){ const px=Math.random()*128; x.moveTo(px,0); x.bezierCurveTo(px+6,42,px-6,86,px,128); }
+    else{ const py=Math.random()*128; x.moveTo(0,py); x.bezierCurveTo(42,py+4,86,py-4,128,py); }
+    x.stroke();
+  }
+  const t=new THREE.CanvasTexture(c);
+  t.wrapS=t.wrapT=THREE.RepeatWrapping;
+  t.colorSpace=THREE.SRGBColorSpace;
+  return t;
+}
+const grassMottleTex=noiseTex(160,0.5,128); grassMottleTex.repeat.set(5,5);
+const woodGrainTex=grainTex(false);
 
 // soft radial-gradient canvas textures for sprites
 function radialTex(stops){
@@ -946,6 +984,7 @@ function buildIslands(){
     const blend = new THREE.Mesh(blendGeo, blendMat);
     blend.scale.y = 0.30; blend.position.y = 0.25; blend.receiveShadow=true; g.add(blend);
     const grassMat = new THREE.MeshStandardMaterial({color:new THREE.Color().setRGB(0.16,0.30,0.14), roughness:1,
+        map:grassMottleTex,
         emissive:new THREE.Color().setRGB(0.020,0.038,0.018)});
     landMats.push(grassMat);
     const grass = new THREE.Mesh(grassGeo, grassMat);
@@ -1007,8 +1046,8 @@ function buildIslands(){
     const dx=Math.cos(dockAng), dz=Math.sin(dockAng);
     const dock = new THREE.Group();
     // individual planks with grain-tone and lie jitter — one box always reads as a ramp
-    const plankMatA = new THREE.MeshStandardMaterial({color:0x5a4632,roughness:1});
-    const plankMatB = new THREE.MeshStandardMaterial({color:0x4e3c2a,roughness:1});
+    const plankMatA = new THREE.MeshStandardMaterial({color:0x5a4632,roughness:1,map:woodGrainTex});
+    const plankMatB = new THREE.MeshStandardMaterial({color:0x4e3c2a,roughness:1,map:woodGrainTex});
     const nPlank = Math.floor(dockLen/0.62);
     for(let p=0;p<nPlank;p++){
       const plank = new THREE.Mesh(new THREE.BoxGeometry(2.35,0.10,0.52), (p%2?plankMatB:plankMatA));
@@ -1526,6 +1565,21 @@ const boat = new THREE.Group();
 let lanternMesh=null, boatLamp=null, blobShadow=null;
 const boatMats={};
 const GLASS_TINTS={warm:0xffc860, rose:0xff8aa0, seaglass:0x9affc8};
+let namePlateMat=null;
+function updateBoatName(){
+  if(!namePlateMat) return;
+  const c=document.createElement('canvas'); c.width=256; c.height=64;
+  const x=c.getContext('2d');
+  x.font='italic 30px Georgia'; x.textAlign='center'; x.textBaseline='middle';
+  x.strokeStyle='rgba(24,16,8,0.65)'; x.lineWidth=5;
+  x.strokeText(S.paint.name||'Skipjack',128,32);
+  x.fillStyle='#f2e6cc';
+  x.fillText(S.paint.name||'Skipjack',128,32);
+  const t=new THREE.CanvasTexture(c);
+  t.colorSpace=THREE.SRGBColorSpace;
+  if(namePlateMat.map) namePlateMat.map.dispose();
+  namePlateMat.map=t; namePlateMat.needsUpdate=true;
+}
 const WAKE_COLORS={
   classic:{ribbon:[0.88,0.93,0.95], puff:0xdfeaf0, label:'#e0eaf0'},
   gold:{ribbon:[1.0,0.86,0.55], puff:0xffe2a8, label:'#ffd98a'},
@@ -1618,6 +1672,12 @@ function buildBoat(){
   rod.position.set(0.72,1.0,-2.05); rod.rotation.x=-2.4; boat.add(rod);
   const lineGeo = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0.72,0.28,-2.95), new THREE.Vector3(0.74,-0.2,-3.12)]);
   boat.add(new THREE.Line(lineGeo, new THREE.LineBasicMaterial({color:0x9aa4ac,transparent:true,opacity:0.5})));
+  // her name, painted on the stern
+  namePlateMat=new THREE.MeshBasicMaterial({transparent:true, depthWrite:false});
+  const plate=new THREE.Mesh(new THREE.PlaneGeometry(1.5,0.38), namePlateMat);
+  plate.position.set(0,0.55,-2.38); plate.rotation.y=Math.PI; plate.rotation.x=-0.12;
+  boat.add(plate);
+  updateBoatName();
   // lantern arm at the bow
   const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.05,0.06,1.3,6), woodMat);
   pole.position.set(0,0.95,2.30); boat.add(pole);
@@ -2734,6 +2794,39 @@ function updateDayCard(dt){
   if(dayCardT>0){ dayCardT-=dt; if(dayCardT<=0) $('daycard').style.opacity='0'; }
 }
 
+// bird Vs against the dusk
+let flock=null, flockT=90;
+function updateFlock(dt){
+  const duskish=(S.hour>=17&&S.hour<19.4)&&S.weather!=='rain';
+  if(!flock){
+    if(duskish){ flockT-=dt;
+      if(flockT<=0){
+        flockT=100+Math.random()*140;
+        const g=new THREE.Group();
+        const bm=new THREE.MeshBasicMaterial({color:0x141a22});
+        for(let i=0;i<7;i++){
+          const b=new THREE.Mesh(new THREE.ConeGeometry(0.5,1.6,4), bm);
+          const row=Math.ceil(i/2), side=i===0?0:(i%2?-1:1);
+          b.position.set(side*row*3.2, -row*0.4, row*2.6);
+          b.rotation.x=Math.PI/2;
+          g.add(b);
+        }
+        const a=Math.random()*Math.PI*2;
+        g.position.set(S.boat.x+Math.cos(a)*240, 46+Math.random()*22, S.boat.z+Math.sin(a)*240);
+        const dir=a+Math.PI+(Math.random()-0.5)*0.6;
+        g.rotation.y=-dir+Math.PI/2;
+        scene.add(g);
+        flock={g, dir, age:0};
+      }
+    }
+    return;
+  }
+  flock.age+=dt;
+  flock.g.position.x+=Math.cos(flock.dir)*9*dt;
+  flock.g.position.z+=Math.sin(flock.dir)*9*dt;
+  flock.g.position.y+=Math.sin(flock.age*0.6)*dt*1.2;
+  if(flock.age>70){ scene.remove(flock.g); flock=null; }
+}
 let chimAcc=0;
 function updateLife(dt){
   const night=(S.hour>=20.5||S.hour<5);
@@ -2758,6 +2851,7 @@ function updateLife(dt){
   updateAurora(dt,night);
   updateRainbow(dt);
   updateEncounters(dt);
+  updateFlock(dt);
   updateTufts();
   updateGlints(dt);
   updateOceanLife(dt);
@@ -4241,7 +4335,7 @@ function renderDockBody(isl){
       }
       const sp=SPECIES[p.species]; const fr=freshness(p); const price=Math.round(fishPrice(p)*mk);
       total+=price;
-      row.innerHTML=`<div class="info"><div class="name">${sp.icon} ${sp.name}
+      row.innerHTML=`<div class="info"><div class="name"><img src="${fishArtFor(p.species)}" style="width:30px;height:19px;vertical-align:-4px;margin-right:2px;"> ${sp.name}
           <span class="fresh-tag ${fr>0.8?'fresh-hi':'fresh-lo'}">${fr>0.8?'fresh':fr>0.55?'day-old':'tired'}</span>${(p.size||1)>=1.25?` <span class="fresh-tag fresh-hi">big ×${p.size.toFixed(2)}</span>`:''}</div>
         <div class="meta">${sp.rar} · ${p.cells.length} cell${p.cells.length>1?'s':''}${(p.size||1)<0.8?' · a little one':''}</div></div>
         <div class="price">$${price}</div>`;
@@ -4434,6 +4528,23 @@ function renderDockBody(isl){
       sw2.appendChild(b);
     }
     row2.appendChild(sw2); body.appendChild(row2);
+    // her name
+    const rowN=document.createElement('div'); rowN.className='row';
+    rowN.innerHTML=`<div class="info"><div class="name">Her name</div><div class="meta">painted on the stern</div></div>`;
+    const nwrap=document.createElement('div'); nwrap.style.cssText='display:flex;gap:6px;align-items:center;';
+    const inp=document.createElement('input'); inp.maxLength=14; inp.value=S.paint.name||'Skipjack';
+    inp.style.cssText='background:rgba(6,10,18,0.6);border:1px solid var(--panel-line);border-radius:7px;color:var(--cream);padding:5px 9px;width:118px;font-size:13px;';
+    const nb=document.createElement('button'); nb.className='btn'; nb.textContent='Paint · $10';
+    nb.addEventListener('click',()=>{
+      const v=inp.value.trim().slice(0,14);
+      if(!v || v===S.paint.name) return;
+      if(S.money<10){ toast('Painting a name costs $10.'); return; }
+      S.money-=10; S.paint.name=v; updateBoatName(); sfxCoin();
+      toast(`She's the “${v}” now.`);
+      updateHUD(); save();
+    });
+    nwrap.appendChild(inp); nwrap.appendChild(nb);
+    rowN.appendChild(nwrap); body.appendChild(rowN);
   }
   else if(dockTab==='shipwright'){
     const UP=[
@@ -4529,6 +4640,69 @@ function fadeSleep(){
   },1200);
 }
 
+// ---------- fish portraits — every species gets a little painting ----------
+const fishArt={};
+function fishArtFor(id){
+  if(fishArt[id]) return fishArt[id];
+  const sp=SPECIES[id];
+  const c=document.createElement('canvas'); c.width=64; c.height=40;
+  const x=c.getContext('2d');
+  const col=sp.color, cx=30, cy=20;
+  const outline=(fn)=>{ x.strokeStyle='rgba(20,26,34,0.55)'; x.lineWidth=1.2; fn(); x.stroke(); };
+  if(sp.icon==='🦀'){
+    x.fillStyle=col;
+    x.beginPath(); x.ellipse(cx,cy+2,13,9,0,0,6.28); x.fill();
+    for(const s of [-1,1]) for(let l=0;l<3;l++){
+      x.strokeStyle=col; x.lineWidth=2.4;
+      x.beginPath(); x.moveTo(cx+s*10,cy+2+l*2); x.lineTo(cx+s*(17+l),cy+7+l*2); x.stroke();
+    }
+    for(const s of [-1,1]){
+      x.fillStyle=col;
+      x.beginPath(); x.ellipse(cx+s*13,cy-7,4.5,3.5,s*0.5,0,6.28); x.fill();
+    }
+    x.fillStyle='#1a2028';
+    x.beginPath(); x.arc(cx-4,cy-3,1.5,0,6.28); x.arc(cx+4,cy-3,1.5,0,6.28); x.fill();
+  } else if(sp.icon==='🦑'){
+    x.fillStyle=col;
+    x.beginPath(); x.moveTo(cx-4,cy-14); x.lineTo(cx+4,cy-14); x.lineTo(cx+8,cy); x.lineTo(cx-8,cy); x.closePath(); x.fill();
+    x.beginPath(); x.ellipse(cx,cy+2,8,6,0,0,6.28); x.fill();
+    x.strokeStyle=col; x.lineWidth=2;
+    for(let tn=0;tn<5;tn++){
+      x.beginPath(); x.moveTo(cx-6+tn*3,cy+6); x.quadraticCurveTo(cx-8+tn*4, cy+14, cx-7+tn*3.5, cy+17); x.stroke();
+    }
+    x.fillStyle='#1a2028'; x.beginPath(); x.arc(cx-3,cy+1,1.6,0,6.28); x.arc(cx+3,cy+1,1.6,0,6.28); x.fill();
+  } else if(sp.icon==='🦪'||sp.icon==='🐚'){
+    x.fillStyle=col;
+    x.beginPath(); x.moveTo(cx,cy+9);
+    x.arc(cx,cy+9,15,Math.PI*1.15,Math.PI*1.85); x.closePath(); x.fill();
+    x.strokeStyle='rgba(20,26,34,0.4)'; x.lineWidth=1;
+    for(let rr=0;rr<4;rr++){ x.beginPath(); x.moveTo(cx,cy+9); x.lineTo(cx-11+rr*7.4, cy-5); x.stroke(); }
+    if(sp.icon==='🦪'){ x.fillStyle='#f4f0e8'; x.beginPath(); x.arc(cx,cy+1,2.4,0,6.28); x.fill(); }
+  } else if(sp.icon==='🦐'){
+    x.strokeStyle=col; x.lineWidth=6; x.lineCap='round';
+    x.beginPath(); x.arc(cx,cy-2,10,0.2,Math.PI*0.9); x.stroke();
+    x.lineWidth=2;
+    x.beginPath(); x.moveTo(cx-10,cy+2); x.lineTo(cx-16,cy-4); x.moveTo(cx-10,cy+2); x.lineTo(cx-17,cy+1); x.stroke();
+    x.fillStyle='#1a2028'; x.beginPath(); x.arc(cx-9,cy-1,1.4,0,6.28); x.fill();
+  } else {
+    const len=sp.cells.length;
+    const long=len>=3 && sp.cells.every(cc=>cc[0]===0);
+    const bw=long?23:15, bh=long?6:9;
+    x.fillStyle=col;
+    x.beginPath(); x.moveTo(cx+bw-2,cy); x.lineTo(cx+bw+8,cy-7); x.lineTo(cx+bw+8,cy+7); x.closePath(); x.fill();
+    const g=x.createLinearGradient(0,cy-bh,0,cy+bh);
+    g.addColorStop(0,col); g.addColorStop(1,'#e8e2d2');
+    x.fillStyle=g;
+    x.beginPath(); x.ellipse(cx,cy,bw,bh,0,0,6.28); x.fill();
+    x.fillStyle=col;
+    x.beginPath(); x.moveTo(cx-6,cy-bh+1); x.quadraticCurveTo(cx,cy-bh-6,cx+7,cy-bh+1); x.closePath(); x.fill();
+    x.fillStyle='#1a2028'; x.beginPath(); x.arc(cx-bw*0.55,cy-2,1.8,0,6.28); x.fill();
+    outline(()=>{ x.beginPath(); x.ellipse(cx,cy,bw,bh,0,0,6.28); });
+  }
+  fishArt[id]=c.toDataURL();
+  return fishArt[id];
+}
+
 // ---------- codex ----------
 function renderCodex(){
   const g=$('codex-grid'); g.innerHTML='';
@@ -4536,7 +4710,7 @@ function renderCodex(){
   for(const [id,sp] of Object.entries(SPECIES)){
     const n=S.codex[id]||0; if(n>0) caught++;
     const card=document.createElement('div'); card.className='codex-card'+(n?'':' unknown');
-    card.innerHTML=`<div class="codex-sil" style="background:${n?sp.color+'33':'rgba(242,233,216,0.06)'}">${n?sp.icon:'❔'}</div>
+    card.innerHTML=`<div class="codex-sil" style="background:${n?sp.color+'33':'rgba(242,233,216,0.06)'}">${n?`<img src="${fishArtFor(id)}" style="width:44px;height:28px;">`:'❔'}</div>
       <div><div class="cname">${n?sp.name:'???'}</div><div class="chint">${sp.hint}</div></div>
       ${n?`<div class="count">×${n}${S.records[id]?`<br><span style="color:var(--dim);">best ${S.records[id].toFixed(2)}</span>`:''}</div>`:''}`;
     g.appendChild(card);
@@ -4694,6 +4868,7 @@ function savePhoto(){
 // ---------- input ----------
 const keys={};
 addEventListener('keydown',(e)=>{
+  if(e.target && (e.target.tagName==='INPUT'||e.target.tagName==='SELECT'||e.target.tagName==='TEXTAREA')) return;
   if(S.mode==='title') return;
   if(e.code==='KeyP' && !paused){ togglePhoto(); return; }
   if(photoMode){
